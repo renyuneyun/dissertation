@@ -7,12 +7,12 @@ To avoid confusion, we present how we use terminology in this document.
 
 \begin{itemize}
 
-\item \emph{PE} is short for Processing Element, which is the basic component of dispel4py graph (detailed later). In most cases, a \emph{PE} is equivalent to a \emph{task} in a workflow. We will use the term \emph{PE} instead of \emph{task} when talking about dispel4py.
+\item \emph{PE} is short for Processing Element, which is the basic component of \dpy graph (detailed later). In most cases, a \emph{PE} is equivalent to a \emph{task} in a workflow. We will use the term \emph{PE} instead of \emph{task} when talking about \dpy.
 
-\item \emph{Task} means a specific computation job in a workflow. Each workflow consists of many \emph{tasks}. Sometimes, we use \emph{(sub-)task} instead of \emph{task} for clarity, but they mean the same. It will be used when we are not talking specifically about dispel4py.
+\item \emph{Task} means a specific computation job in a workflow. Each workflow consists of many \emph{tasks}. Sometimes, we use \emph{(sub-)task} instead of \emph{task} for clarity, but they mean the same. It will be used when we are not talking specifically about \dpy.
 
 \begin{term_box}
-Although \emph{PE} and \emph{task} are usually interchangeable in our context, there is a difference in the common case. Normally, \emph{task} is used in the task-oriented environment so they will exit after processing; \emph{PE} is a term in dispel4py (which is a \emph{data-streaming} system), so they will keep running and waiting for more data after processing a unit of data until no more data coming in.
+Although \emph{PE} and \emph{task} are usually interchangeable in our context, there is a difference in the common case. Normally, \emph{task} is used in the task-oriented environment so they will exit after processing; \emph{PE} is a term in \dpy (which is a \emph{data-streaming} system), so they will keep running and waiting for more data after processing a unit of data until no more data coming in.
 \end{term_box}	
 	
 \item \emph{Node} means a computer in a network, usually one executing some computational jobs. Because modern computers usually consists of many \emph{core}s, it is not ideal to consider each of the computers (which may have different number of \emph{cores}) as a standalone entity. A better practice would be considering each \emph{node} as a single-core machine.
