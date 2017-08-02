@@ -1,12 +1,37 @@
 \chapter{Terminology}
-Some terminology are used as different meanings by different people. To avoid confusion, we will now present how we use these terminology in this document.
+To avoid confusion, we present how we use terminology in this document.
+
+\newenvironment{term_box}{\begin{tcolorbox}[enhanced,width=5in,size=fbox,
+    fontupper=\large\bfseries,drop shadow southwest,sharp corners]}{
+\end{tcolorbox}}
 
 \begin{itemize}
-	\item \emph{PE} is short for Processing Element, which is the basic component of dispel4py graph (detailed later). In most cases, a \emph{PE} is equivalent to a \emph{task} in a workflow. We will use the term \emph{PE} instead of \emph{task} when talking about dispel4py.
-	\item \emph{Task} means a specific computation job in a workflow. Each workflow consists of many \emph{tasks}. Sometimes, we use \emph{(sub-)task} instead of \emph{task} for better clearance, but they mean the same. It will be used when we are not talking specifically about dispel4py.
-	\item \emph{Node} means a computer in a network, usually one executing some computational jobs. It will usually be considered as a single processor (core), so we will often consider each processor (core) as one \emph{node}. Usually, one \emph{node} carries one \emph{task}, so they are sometimes used exchangeably.
-	\item \emph{Unit} means a piece of data produced by some \emph{task}s / \emph{PE}s. Usually, each \emph{task} / \emph{PE} will produce many \emph{unit}s of data with the same format.
-	\item \emph{Data-streaming} means the data produced is not going to be cached on disk (or other permanent storage devices), but to directly send (\ie stream) to the corresponding receiver node(s).
-	\item \emph{Pipeline} refers to the property that the following nodes start to process data when the first \emph{unit} of data is produced (\ie don't have to wait until all data has been produced).
+
+\item \emph{PE} is short for Processing Element, which is the basic component of dispel4py graph (detailed later). In most cases, a \emph{PE} is equivalent to a \emph{task} in a workflow. We will use the term \emph{PE} instead of \emph{task} when talking about dispel4py.
+
+\item \emph{Task} means a specific computation job in a workflow. Each workflow consists of many \emph{tasks}. Sometimes, we use \emph{(sub-)task} instead of \emph{task} for clarity, but they mean the same. It will be used when we are not talking specifically about dispel4py.
+
+\begin{term_box}
+Although \emph{PE} and \emph{task} are usually interchangeable in our context, there is a difference in the common case. Normally, \emph{task} is used in the task-oriented environment so they will exit after processing; \emph{PE} is a term in dispel4py (which is a \emph{data-streaming} system), so they will keep running and waiting for more data after processing a unit of data until no more data coming in.
+\end{term_box}	
+	
+\item \emph{Node} means a computer in a network, usually one executing some computational jobs. Because modern computers usually consists of many \emph{core}s, it is not ideal to consider each of the computers (which may have different number of \emph{cores}) as a standalone entity. A better practice would be considering each \emph{node} as a single-core machine.
+
+\item \emph{Core} refers to a CPU core. A modern computer consists of many \emph{core}s, so \emph{core} is not the same as \emph{node}. Usually we won't use \emph{core} directly because programming doesn't directly operate on \emph{core}s.
+
+\begin{term_box}
+Although \emph{node} and \emph{core} are different in definition, we would usually consider each \emph{node} as a single-\emph{core} machine, which means they are the same in our context (and we prefer to use \emph{node}).
+\end{term_box}	
+
+\begin{term_box}
+Notice that each \emph{task} or \emph{PE} is usually programmed with no aware of multi-cores. However, they can wield multi-threading to perform necessary light-weight (i.e. not computational-intensive) tasks (such as communication).
+\end{term_box}
+	
+\item \emph{Unit} means a piece of data produced by some \emph{task}s / \emph{PE}s. Usually, each \emph{task} / \emph{PE} will consume or produce many \emph{unit}s of data with the same format (on each data stream).
+
+\item \emph{Data-streaming} means the data produced is not going to be cached on disk (or other permanent storage devices), but to be directly sent (\ie streamed) to the corresponding receiver node(s).
+
+\item \emph{Pipeline} refers to the property that the following nodes start to process data when the first \emph{unit} of data is supplied (\ie it does not wait until all data has been produced by upstream \emph{PE}s).
+
 \end{itemize}
 
