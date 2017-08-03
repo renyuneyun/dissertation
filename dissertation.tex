@@ -31,9 +31,20 @@
 \usepackage{graphicx}
 \usepackage[normalem]{ulem}
 \usepackage[skins]{tcolorbox}
+\usepackage{xspace}\usepackage[inline]{enumitem}
 
-\newcommand{\dpy}{dispel4py }
-\newcommand{\Dpy}{Dispel4py }
+\newcommand{\dpy}{dispel4py\xspace}
+\newcommand{\Dpy}{Dispel4py\xspace}
+
+\newcommand{\THE}[1]{the #1}
+
+\newcommand{\tesieve}{sieve of Eratosthenes\xspace}
+\newcommand{\teSieve}{Sieve of Eratosthenes\xspace}
+\newcommand{\ttesieve}{\THE{\tesieve}}
+\newcommand{\tsieve}{\tesieve}
+\newcommand{\tSieve}{\teSieve}
+\newcommand{\ttsieve}{\THE{\tsieve}}
+\newcommand{\ttSieve}{\THE{\tSieve}}
 
 \title{Making \dpy dynamic}
 \author{Rui Zhao s1623641}
@@ -79,6 +90,8 @@ Igor, my faithful lab assistant.
 \include{terminology}
 
 \include{background}
+
+\include{use_case}
 	
 \include{incremental_deployment}
 	
@@ -104,7 +117,7 @@ Igor, my faithful lab assistant.
 % \singlespace
 
 %% Specify the bibliography file. Default is thesis.bib.
-\bibliography{dissertation_bib}
+\bibliography{dissertation_bib,sieve}
 
 %% ... that's all, folks!
 \end{document}

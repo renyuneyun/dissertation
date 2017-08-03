@@ -1,0 +1,36 @@
+\chapter{Use cases}
+We present here two examples that are used to explore the semantics and performance of \dpy. We require to retain all prior semantic interpretations of workflows but introduce new ones that depend on dynamic determination of the generated graph.
+
+We will introduce them separately in the hope that it is more clear to read.
+
+\section{\tSieve}
+We first present \ttsieve which is a very simple yet useful algorithm. We present its basic idea, the common parallel algorithm for \ttsieve and the difficulty to construct it in the current semantics of \dpy (which is one of the motivations of our work).
+
+The known earliest sieve algorithm is \ttesieve given by an ancient Greek mathematician \cite{o2009genuine}. The basic idea of \ttesieve is that we cross out all multiples (up until a certain upper boundary) of every prime at the time we encounter a new prime.
+
+As we are using prime sieves as demonstration, we mainly focus on the correctness and simplicity rather than the efficiency. Therefore, we can simply change the structure of \ttesieve into a distributed manner: each node is responsible for one prime, and it crosses out all multiples of the prime it is responsible for; a continuous integer producer produces integers to the first sieve; each sieve node sends the un-crossed integers to the next sieve node.
+
+As the description of the distributed sieve shows, we need each node responsible for each prime, which means we need to allocate at least number-of-prime sieves before executing the workflow. However, since we don't yet know which those primes are, we also don't know the number of them. This leads to a chicken-and-egg problem. One possible practice is to estimate the number of primes in the region and allocate that many nodes.
+
+\newcommand{\cdIntGen}{\lstinline|IntegerGenerator|\xspace}
+\newcommand{\cdSieve}{\lstinline|PrimeSieve|\xspace}
+
+In the current \dpy system, to construct a workflow for this, we first define two kinds of PEs:
+\begin{enumerate*}
+	\item \cdIntGen which continuously produces integers from 2 up to a certain limit;
+	\item \cdSieve which keeps a prime number it is responsible for and passes all number which is not a multiple of that prime. Then we need to connect the output of \cdIntGen to the input of \cdSieve , and then chain as many \cdSieve{}s as we need.
+\end{enumerate*}
+
+To define the graph, we need exactly two numbers: one is the range (\ie the maximum number) and the other is the number of primes in this region. Typically, we need to first find out the number of primes in this range by running a prime generator elsewhere, and then use it to construct the workflow. If we set the number smaller, the workflow can execute, but will produce unreliable numbers when the actual number of primes exceeds the number of sieves defined in the workflow graph; if we set the number larger, the correctness of the workflow execution will then depend on how outputs from the sieves are connected to the successor nodes (e.g. if only the final sieve is connected to the successor nodes, then there will be no outputs from the last sieve and, therefore, no inputs to the successor so it will behave erroneously).
+
+Two problems emerge from this construction method:
+\begin{enumerate}
+	\item The chicken-and-egg problem previously mentioned;
+	\item A different graph is needed when we want to change the maximum number.
+\end{enumerate}
+
+Both of them are quite unsatisfying for researchers / developers because they both involve manual inspection apart from the basic workflow (especially task) design. Researchers, \eg us, would prefer a more unified automatic way in which we only need to define once without calculating the number of primes before execution.
+
+This motivates our research and we present the new semantics called \emph{dynamic expansion} (in addition to \emph{incremental deployment}) to support this expectation. In the new semantics, we no longer need to manually assign many sieves. Instead, we only need to define the \cdSieve automatically expandable (by setting the \lstinline|repeatable| property to \lstinline|True|) and describe when to expand it (by connecting \lstinline|circuit|). Moreover, in our new system, another new use case is available: to find certain number of primes - by making the \cdSieve nodes aware of their status and no longer expand more sieves (it will be more efficient if \emph{backward shut-down propagation} is implemented). Details will be described in the Dynamic Expansion chapter. 
+
+\section{Seismic cross-correlation}
