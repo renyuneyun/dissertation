@@ -32,6 +32,7 @@
 \usepackage[normalem]{ulem}
 \usepackage[skins]{tcolorbox}
 \usepackage{xspace}\usepackage[inline]{enumitem}
+\usepackage{etoolbox}
 
 \newcommand{\dpy}{dispel4py\xspace}
 \newcommand{\Dpy}{Dispel4py\xspace}
@@ -45,6 +46,17 @@
 \newcommand{\tSieve}{\teSieve}
 \newcommand{\ttsieve}{\THE{\tsieve}}
 \newcommand{\ttSieve}{\THE{\tSieve}}
+
+\newcommand{\defTerm}[2]{%
+  \expandafter\newcommand\csname t#1\endcsname{\emph{#2}\xspace}}
+
+\defTerm{IncDep}{Incremental Deployment}
+\defTerm{Incdep}{Incremental deployment}
+\defTerm{incdep}{incremental deployment}
+
+\defTerm{DynExp}{Dynamic Expansion}
+\defTerm{Dynexp}{Dynamic expansion}
+\defTerm{dynexp}{dynamic expansion}
 
 \title{Making \dpy dynamic}
 \author{Rui Zhao s1623641}
@@ -83,6 +95,7 @@ Igor, my faithful lab assistant.
 % \listoftables
 
 \end{preliminary}
+
 
 %%%%%%%%
 \include{introduction}

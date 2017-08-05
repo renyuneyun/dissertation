@@ -1,107 +1,168 @@
-\chapter{Incremental deployment}
-\sout{The hypothesis and assumptions of dynamic deployment. \\
-The design of the system in order to support dynamic deployment. \\
-The details how we suit the design to the existing dispel4py framework.}
+\newcommand{\defNode}[1]{%
+  \expandafter\def\csname nd#1\endcsname{\emph{#1}\xspace}}
+\newcommand{\defNodes}[1]{\forcsvlist{\defNode}{#1}}
 
-As said in the Background chapter, we expect future researchers would need to design workflows reading data from continuous infinite data sources. Therefore, the execution time of the workflow will also be infinite. Because of the variety of input data, we expect a dynamic way of optimising the target where a task should be deployed. To achieve this, we need first introduce a way to dynamically deploy tasks to computational nodes, and only then can make decisions on-the-fly.
+\chapter{Incremental Deployment}
+In this chapter, we present the \tincdep we introduced for further extension or optimisation of \dpy. We first present why we introduce \tincdep. After that, each section of this chapter contains one main aspect of \tincdep, including the expected behaviour of \tincdep, the semantics changes due to \tincdep and how \tincdep works, except for the last two sections - the second last section presents an example of \tincdep, and the last section presents how we implement \tincdep in \dpy (including what issues we encountered and how we solved them).
 
-Therefore, we introduce \emph{incremental deployment} to accomplish the job to deploy tasks dynamically. The following part of this chapter will first present how we bootstrap our design of the system; then give a high-order description of how we design the system to support \emph{incremental deployment}; later describe in depth how we organise and build each part; finally present how we change our modification to keep the compatibility of existing dispel4py mechanisms.
+We expect, as said in the Background chapter, future researchers would need to design workflows reading data from continuous infinite, on the basis of units, data sources. In this situation, the execution time of the workflow will also be infinite unless manually shut down. Therefore, it is infeasible to use past performance data from an ``infinite workflow'' to guide the deployment of future runs of the same workflow. A more dynamic on-the-fly way of deploying PEs to nodes is needed to support possible optimisations. This is one of the reasons we introduce \tincdep.
 
-\section{Bootstraping the Design}
-To deploy nodes incrementally, we will need a mechanism to guarantee:
+The other reason is that we expect to support a more natural way to design workflows to accomplish tasks such as the \tsieve we discussed in the Use Case chapter. Details of why we need \tincdep to support it will be discussed in \tDynExp chapter.
+
+There is also another reason: we want to minimize the initialization cost for the execution of workflows and spawning, connecting and deploying nodes cost lots of resources, especially time. We expect doing all of spawning and deployment on-the-fly can save time in some cases.
+
+\defTerm{PETmpl}{PE template}
+\defTerm{PEInst}{PE}
+\defTerm{PEDup}{PE instance}
+
+\begin{tcolorbox}[enhanced,width=5.7in,size=fbox,
+    fontupper=\large\bfseries,drop shadow southwest,sharp corners]
+From this chapter on, we will describe into some details. It is useful that we distinguish between \tPETmpl{}s, \tPEInst{}s and \tPEDup{}s: a \tPETmpl is the logic (template) for processing data, usually implemented as a Python class; a \tPEInst is an instance (after construction) of such a class (\tPETmpl); \tPEDup is used only when we are talking about the duplications (which is an existing mechanism in \dpy) of the same \tPEInst. A \tPETmpl can be used to construct many different \tPEInst{}s and they can all behave differently because of, for example, the different parameters used to call the constructor. We will usually not talk about \tPEDup{}s unless we are precisely talking about that mechanism or the impact of it.
+\end{tcolorbox}
+
+\section{Deployment Behaviour}
+As \tincdep is the new extension we introduced, we shall first describe the expected behaviour of it as well as a brief comparison against the old system.
+
+In the current \dpy system, when \dpy wants to deploy \tPEInst to nodes, it will first analyse the workflow to extract the topology and then map \tPEInst{}s to nodes and leave them executing without any more management. The number of nodes used in execution should be assigned prior to execution and is not subject to change during execution.
+
+We want to introduce more dynamic behaviours, so our expected behaviour should be like this:
 \begin{enumerate}
-	\item All PEs who needs a target can get a target.
-	\item All PEs who are connected to the same PE (target) in the workflow will get the same target when we dynamically deploy PEs. That can be decomposed into two parts:
-	\begin{enumerate}
-		\item Two PEs requiring  the same target simultaneously will always get the same target.
-		\item Two PEs requiring the same target at the same time will only trigger one deployment action.
-	\end{enumerate}
-	\item There is no lost of data during execution.
+	\item The user doesn't need to know the actual number of nodes needed to execute a workflow (however, the user \emph{can} know that).
+	\item \Dpy will deploy and run only the source \tPEInst{}s in the beginning, rather than all \tPEInst{}s at once.
+	\item Other \tPEInst{}s will be deployed during running and each \tPEInst should be deployed exactly once so data transmission won't go wrong because of this late-deploy behaviour.
+	\item When a unit of data is going to be sent through an output connection, it will go to the correct destination.
+	\item If the output connections of more than one \tPEInst{}s are connected to the same input connection of another \tPEInst, the data sent through these output connections will go to (the same input connection of) the same \tPEInst.
+	\item A \tPEInst should shutdown when there is no more data to produce.
+	\item If a \tPEInst never receives any data from any input connections, this \tPEInst doesn't need to be deployed.
 \end{enumerate}
 
-Because of the nature of distributed computing, we couldn't find a low-cost way (\ie without many communications) to guarantees all these requirements. Therefore, we decide to introduce a coordinator whose main job it to handle the assignment / deployment and we will keep the transmission / communications minimal and keep the workload of the coordinator minimal to in case it becomes the bottleneck.
+To satisfy all these needs, especially the 2nd and 5th points, we need a mechanism to synchronize the knowledge of \tPEInst{}s so no duplicated deployment or lost of data will happen. Because of the nature of distributed computing, we couldn't, at least during the time, find a low-cost way (\ie without many signalling rounds) to guarantee these requirements in a fully de-centralized manner. Therefore, we introduced a coordinator to handle the deployment. We will show, in the Coordinator section below, that our communication strategy is the minimal possible.
 
-Basically, when a PE wants to send data through an output connection to a target, it will need to know the address of the target PE. If it doesn't know that address yet, it will need to request for the address. This could be done in a pair of communications - the first is from the PE to the coordinator (requiring the target), and the second is from the coordinator to the PE (informing the address of the target). If the target doesn't exist at the time of the request, the coordinator postpones the reply and tries to deploy the target first (and then sends the reply).
+To put all these together, the deployment behaviour now is:
+\begin{enumerate*}
+	\item The coordinator will be launched first in the beginning
+	\item The coordinator analyses the workflow and deploys the source \tPEInst{}s (\ie \tPEInst{}s without any explicit input connections).
+	\item the coordinator deploys the successor \tPEInst to a node when a \tPEInst needs to send data through an output connection which is connected to a input connection of the successor.
+\end{enumerate*}
 
-Naturally, when multiple PEs are requiring a same target at the same time, the coordinator could sequentialize these requests so only the first request actually triggers the deployment action while others simply wait until the deployment succeeds. There is also a possible scenario that one output connection connects to multiple targets. The above strategy can be easily extended to handle it: just check all possible targets (instead of assuming only one target there is) to see if another request is dealing with it. This can be done in either a sequential way or in parallel.
+\section{Revised Semantics for Sending Data}
+We briefly mentioned when sending data through an output connection, the coordinator is responsible for deploying the successor \tPEInst{}(s). Here we present how the semantics for sending data has changed and how this is reflected in out implementation of sending data.
 
-To reduce transmissions and save time, when a PE receives the target of an output connection, it caches the targets locally. When it wants to send data through this output connection again, it can directly use the cached information and there is no need to communicate to the coordinator again because, at our current stage, the deployed PEs won't move and all targets are deployed already when the coordinator sends the reply. Therefore, we can finalize the strategy to send data through a connection:
+In the old \dpy system, because all \tPEInst{}s are deployed in the beginning, all nodes are completely aware with which input connection of which node is an output connection connected. As a result, when an output is produced, the node knows naturally where it will go to. However, because \tPEInst{}s are deployed dynamically when we introduce \tincdep, all nodes lose this knowledge so this semantics is subject to change.
 
-FLOW CHART HERE
+In \tincdep, when a \tPEInst produces a unit of data and sends it through an output connection, this action triggers a lookup to find the correct targets (both input connections and nodes). If the targets haven't been deployed yet, the send action will hang up to wait for the completion of the deployment (which is performed by the coordinator) of the targets and then the send action proceeds.
 
-In the above discussion, we assumes the strategy of deployment is known. However, we haven't really discussed it yet. Now is the time to design it.
+In our implementation, when a \tPEInst produces a unit of data, the node (which runs the \tPEInst) will communicate with the coordinator to request the destination(s) of the output connection. Then it waits for the reply from the coordinator to tell it where that data should be sent to. When it receives the reply, it caches the information (reply) and when next time it is going to send data through the same output connection, it will use the cached information instead of communicating with the coordinator a second time. 
+The deployment strategy and process is hidden to the execution nodes, so their main job is still executing the \tPEInst.
 
-To deploy a PE to a node, the coordinator sends a ``deploy'' communication with the PE that is going to be deployed to the node. We can, as provided by python, give all nodes the knowledge of all possible PEs. Therefore, the communication doesn't need to contain the whole object - only the name and / or necessary instructions to construct the PE can give the target node enough knowledge to construct the PE on its side. After constructing the target PE, the target node tells the coordinator that it is ready to receive data and then the coordinator can do other stuffs (\eg reply the address of this target when needed).
+It is clear that in this strategy we only add an inspection to the procedure for sending data: to acquire the destination from the coordinator the first time an output connection is used. The rest part of the existing procedure remains unchanged.
 
-Apparently, a workflow will usually contain many PEs, so the coordinator will need to store the information that which PE is deployed to which node. When further requests come, the coordinator will first lookup to see if the PE is deployed or not.
+\section{Target Selection of Deployment}
+What happens during the time the execution node waits for the reply from the coordinator? The coordinator finds the successor \tPEInst{}s which have input connections connected to that output connection, and deploys the \tPEInst{}s to some nodes.
 
-Data are streamed directly from PEs (nodes) to PEs (nodes), and they won't pass through the coordinator.
+The step to find the successor \tPEInst{}s is fairly simple: the input and output connection pairs are seen as edges in a graph and the coordinator did a topological sort in the beginning so it can barely lookup the result.
 
-The last question is how to determine when the execution of the workflow has finished (if the source is finite). We follow the existing design of the system to use a propagation fashion. By appending an ``end-of-stream'' marker to the end (\ie last unit) of each data steam, a PE can know how many previous nodes have finished producing outputs. Apparently, we will only need to give each PE the knowledge of the total number of previous nodes and then the PE can tell if all previous nodes have finished or not. If all previous nodes have finished producing outputs, the current node knows there won't be more inputs and therefore no more outputs will be produced by itself, so it can send (propagate) the ``end-of-stream'' marker to all its following PEs. Although it seems that we can do this on either PE level (when a PE has finished producing more data) or connection level (when no more data is going to be sent through a connection), in reality we prefer to do it on PE level because determining whether no more data is going to be sent through a connection requires the programmer of the PE to create extra logic to indicate this in a pipeline system.
+When the coordinator knows the successor \tPEInst{}s, it will need to deploy them correspondingly to some nodes. In our system, we perform a plain lookup in the table which contains the status (busy or free) of nodes, and use the first enough free nodes. We are aware that there is a potential optimisation for selecting the nodes to deploy the \tPEInst{}s, such as considering the network speed between the nodes, or considering the computational capability of nodes. However, because of the time limit, it is not possible to accomplish it in our MSc project.
 
-\section{General design}	
-As described above, we introduce a coordinator in addition to the PEs defined in the workflow, and degrades other nodes as executors (while still maintains the existing ``wrapper'' mechanism to PEs). The structure of our system is:
+During the lookup, if there is no enough nodes available (free), the coordinator will spawn more nodes and try again. We can use different strategies to decide the number of nodes to be spawned, but we only use a constant for now.
 
-HERE SHOULD BE A FIGURE
+\section{Coordinator}
+The above two sections only talked about the general role of the coordinator. In this section, we present the actual behaviour of the coordinator during deployment.
 
-The coordinator possesses the knowledge of the whole graph and current assignments, and handles deployment. Deployment happens when a node (which has been deployed previously) sends a ``require'' message along with the name of the output connection. When receiving this message, the coordinator first checks whether the target PE is already deployed or not: if it is already deployed, the coordinator simply replies it; if not, find nodes that are suitable to deploy, send deployment signal and reply with the assignment. Finally, when all nodes are finished (\ie no node is working and no deployment on-the-way), the coordinator also sends the ``finalize'' signal to all executors and then the whole execution of the workflow is shut down.
- 
-The main job of an executor is to execute one PE (in a wrapper) in the workflow. Apart from executing the PE (inside the wrapper), it also receives the deployment of itself (from coordinator) and receives shut-down (``finalize'') messages. All other actions are done in the wrapper.
+The coordinator first performs a topological sorting to the workflow graph in the beginning, and stores which output connection (and the \tPEInst) is connected with which input connection in a quick lookup table (hash table). It then deploys the source nodes which have no input connections (\ie zero in-degree). The coordinator stores a record (array) which keeps the status of every execution nodes, to track whether they are busy (has a \tPEInst deployed deployed at the moment) or free (has no \tPEInst deployed at the moment), and also the \tPEInst each busy node is running.
+Then, the coordinator waits for signals (\ie communications) from the execution nodes after sources are deployed.
 
-A wrapper is the place that handles data receiving and sending of a PE. In addition to these original functions, we extend the wrapper to suit the need of incremental deployment - to request targets when an output is going to be sent through a new output connection, and wait for coordinator's reply. Specifically, an ``end-of-stream'' marker is sent after the last unit of data through all related output connections and the wrapper shuts itself down and returns control to the executor; when a wrapper receives enough (\ie the same as the sum of the number of nodes from each input connection) ``end-of-stream'' markers from its previous nodes, it then knows there is no more data and then propagates the ``end-of-stream'' marker through all its output connections the same way as previously described; in addition to propagation of the ``end-of-stream'' marker through the workflow graph, when each wrapper shuts itself down, it also sends a ``terminated'' signal to the coordinator so the coordinator knows this node is free (\ie back to the initial ``executor'' state and can then reassign it another PE if any.
+During waiting, when the coordinator receives a signal which requires the successors of an output connection, it lookups what input connections and \tPEInst{}s are connected with this output connection, and then checks each of the \tPEInst{}s in the record to see if it is already deployed. For each of those undeployed \tPEInst{}s, the coordinator will deploy it to a node and record this deployment. After all these \tPEInst{}s are deployed, the coordinator replies the requester with the input connections and the nodes where these \tPEInst{}s are deployed.
 
-Finally, there is an existing ``grouping'' mechanism which will create some duplicated PEs when deploying, and scatter data among them all so each of them could have fewer data to process and may reduce the total execution time. Our system introduces a local leader (called ``representative'') in each group who is in charge of the synchronization between groups. The detailed synchronisation strategy will be discussed below.
+It is apparent that there is no need for a node to request for the successors of the same output connection more than once because the deployment won't be changed, so each execution node will cache the reply (or any modifications to the reply) locally. It is also apparent that there is no need for the coordinator to send an ``ack'' back to the requester when receiving the request or for the requester to send an ``ack'' back to the coordinator when receiving the reply from the coordinator, because there is no subsequent actions after each of these signals as long as we can guarantee each message will eventually arrive (which is true under MPI).
 
-\section{Structure of Components}
-After finishing the general design of the system, we will now suit the design to our actual platform. We will consider these points: efficiency and concurrency, synchronization, compatibility (of existing designs), and spawning (more node when needed).
+When deploying the \tPEInst, the coordinator sends the information necessary for a node to construct the \tPEInst. In our implementation, we assign an unique ID for each \tPEInst in the workflow and all nodes possess the knowledge of the workflow. Therefore, the coordinator simply sends the ID of the target \tPEInst to the node and the node directly looks up the \tPEInst in the workflow and execute it. We can think of an alternative method which may be more flexible: send instructions/information necessary to construct the \tPEInst from \tPETmpl to the target node (and also adjust the workflow not to directly use \tPEInst{}s but to use construction information of every \tPEInst{}), so the coordinator can modify these instructions/information if needed. However, because we are constrained by time, we only implemented a backward-compatible method.
 
-\subsection{Efficiency and Concurrency}
-We described a bit in the above  about the possibility of concurrency in the components. Making them run concurrently can usually bring better efficiency.
+\section{Shutdown Process}
+The execution should be able to begin, and should also be able to shutdown properly. In this chapter, we describe how the shutdown process works.
 
-Because each PE is self-contained, we use multi-threading to achieve concurrency. It should be mentioned that each PE is designed to be single-threaded (at least, behaves like single-threaded).
+\newcommand{\dEOS}{end-of-stream\xspace}
 
-The first is the coordinator. We can expect many communication to and from the coordinator run in parallel. Therefore, we will handle each request in a separate thread. Because multiple requests may act on a same PE, we will add a lock to each PE and acquire it when it is going to be act on (and release it when finished) so different requests of this same PE will be sequentialized.
-
-Then is the executor. Because the function of executors is very simple and will only receive data, there is no need to make them run in multiple threads. Therefore, we design the executor to run in a single-threaded way.
-
-Finally is the wrapper. Because a wrapper reads data from some input connections, processes the data previously read and writes processed output to some output connections, we run ``read'' in one thread, and run ``process'' and ``write'' together in another thread. If the order of data doesn't matter, we will run both ``process'' and ``write'' in several threads (in a thread pool). Because we need also request the address of targets, we need to design a suitable place to handle the communication to the coordinator. We decide to send the request at where is needed, and listen in another dedicated thread. The synchronous will be done by using condition variables - wait for the condition variable to become true after sending the request, and set it to true when receiving the reply.
-
-\subsection{Synchronization}
-One important aspect of distributed computing is to make sure the parallel execution won't break the needs of ordered messages \cite{•}. Though not all messages need to be strictly ordered, some important messages should be kept ordered. Therefore, synchronization between nodes is very important.
-
-In our system, there are several causalities which imply message ordering: receiving the target happens after target is deployed; ``end-of-stream'' marker sends and receives after all data units (which also implies shutting down only after receiving all data units). It becomes even more complicated when we try to handle the ``grouping'' mechanism: not all nodes inside a group will send data to some targets, so how to make sure shut-down propagation works correctly?
-
-Luckily, MPI guarantees ordering of messages between each pair of nodes in one communicator \cite{MPI-3.0}, data won't be lost until it is received or cancelled and it provides several synchronization options for receiving and sending data. This slightly reduces our workload: the coordinator can always safely reply targets to the PE regardless of whether the target has finished initialization or not because the data won't be lost (so we don't need to do synchronization to make sure the target is ready); if we send the ``end-of-stream'' marker after all data units, the receiver side will not receive it before any data units.
-
-However, we still need to carefully design the system especially when we try to keep the ``grouping'' mechanism. By introducing the local leader (\ie representative), we will use it to do synchronization of shut-down propagation from group to group, and all other nodes in that group (called ``brothers'' to the ``representative'') will not do synchronization across groups. Basically, we are aware that it is impossible for an unknown number of nodes (without doing explicit synchronization) to correctly propagate ``end-of-stream'' marker - because the number of sources is unknown to the receiver side. Therefore, we make the representative in charge of propagating ``end-of-stream'' marker. Roughly, the behaviour could be drawn like this:
+In the existing \dpy system, the shutdown process is done by performing forward shutdown propagation. It consists of the following steps:
 \begin{enumerate}
-	\item The ``end-of-stream'' marker will send to all groups and all nodes in each group.
-	\item All nodes in the group who has finished producing more data will tell the representative that they are going to shut down and then they can shut down.
-	\item Upon receiving a shut-down message from inside the group, the representative will check if that's the last node (including itself) who is going to shut down. If it is, then the representative propagates the ``end-of-stream'' marker to all following nodes and then shut itself down.
+	\item When a \tPEInst has no more data to produce (e.g. because it is the source process and it has produced all data it is designed to produce), it will send an ``\dEOS'' marker through all output connections. Then it shuts itself down.
+	\item These \dEOS markers will then be received by the successor \tPEInst{}s and they will decide whether all inputs have received enough numbers of the \dEOS marker.
+	\item If all input connections have received enough \dEOS markers, the \tPEInst will propagate the \dEOS markers to all output connections, and shuts itself down (same as step 1).
 \end{enumerate}
 
-This strategy can solve the problem of unknown number, but will introduce another problem: the order of messages is only guaranteed for each pair of nodes, but not across pairs of nodes. That means the ``end-of-stream'' marker sent by the representative (node A) may be received (by node R) prior to the last unit of data from one of the brothers (node B), where A and B are in one group.
- Therefore, we need a way to determine whether the receiver side has received all data from the previous group and then the representative can safely propagates the ``end-of-stream'' marker. With the combination of the 
-\lstinline|MPI_Issend()| function and the \lstinline|MPI_Waitall()| function of MPI, we can make each brother wait until all the data sent from it have been received by the receiver side; then, the brother can tell the representative that it is going to shut itself down. Thus, when the representative knows all brothers are going to shut down, all data has already been received so propagating the ``end-of-stream'' marker at that time will not violate any constraints.
+We used an attributive, ``enough'', for correctness in case an input connection has more than one output connections connected. This can be done by using several counters each for one input connection to count for the number of \dEOS received. Furthermore, because the shutdown process works as a whole for the \tPEInst, we don't need a separate counter for each input connections, but only need a total counter for all input connections. More details of the counter will be described in the Lazy Deployment section below.
 
-\subsection{Compatibility}
-Compatibility here refers to both try to support all existing features and try to keep the existing structure of the design, because the current design of dispel4py is used in all parts (all mappings) so if we change one part of the core design, the rest of the code base usually should also be changed.
+By using this method, all nodes will be guaranteed to shut down correctly when there is no more job to do and therefore no more data to produce. We keep this behaviour in our extension (with one difference which will be described in the Lazy Deployment section) so the coordinator doesn't need to propagate shutdown signals.
 
-We have discussed some of the compatibility issues in the above part, such as how we keep the existing ``grouping'' feature while adding incremental deployment. In addition to that, we also slightly modified the design of PE to add an extra field (property) - FIFO. By defining the PE to be FIFO, the wrapper then knows it should not run multiple \lstinline|pe.process()| concurrently, but should execute them sequentially so the outputs are kept to be FIFO. Another important aspect that we haven't discussed yet is the \lstinline|Communication| class used in the dispel4py framework to decide which  target node should the current unit of data be streamed to. A \lstinline|Communication| is constructed with the addresses of target nodes and the connection type. When deciding the target of a unit of data, the name of the output connection is used. Therefore, we will construct the \lstinline|Communication| of an output connection right after the reply of target addresses.
+But we'd like the coordinator to be aware of the status of all nodes so it can re-deploy other \tPEInst{}s to a node which has previously shut down so the resources will be better used. Therefore, we add an additional signal to tell the coordinator that a node is shutting down now. When the coordinator receives this signal, it then marks the signal source as free so the coordinator can re-deploy other \tPEInst{}s to it.
 
-\subsection{Spawning}
-Traditionally, when running an MPI programme, the user needs to decide the number of nodes that is going to be used at the time of execution. However, this method has two drawbacks:
+\section{Backward Shutdown Propagation}
+
+\section{Lazy Deployment}
+Lazy deployment is not a specially designed feature, but a natural feature emerged during the implementation of \tincdep.
+
+As the process of deployment shows, the existing \dpy system will deploy all \tPEInst{}s to all nodes. However, because of the variety and uncertainty of incoming data, sometimes some \tPEInst may never receive any units of data. Therefore, it is not needed to deploy them to nodes. If this is a whole branch of the workflow (because of, \eg, this branch is for debugging), by not deploying these \tPEInst{}s, many nodes can be saved.
+
+With the existence of lazy deployment, \tPEInst{}s will be deployed only if they are needed. This behaviour is the same behaviour of the deployment strategy of \tincdep - that's why we say lazy deployment is naturally emerged.
+
+Because of the existence of lazy deployment, it seems the behaviour of shutdown propagation should be changed slightly. The most natural way for propagating the shutdown signal is: each \tPEInst still propagates the \dEOS signal to all output connections, but only those output connections which has successors deployed will actually send out the \dEOS signal, in order not to trigger a deployment. However, because we need a counter to count for the number of \dEOS{}s from all input connections in order to guarantee the propagation works correctly in the presence of multi-to-one connections, we need another mechanism to guarantee the counter works correctly in lazy deployment. We argue that it is impossible, in a distributed asynchronous system, to guarantee the counter works correctly without doing round communications with the coordinator (\eg, probing to and answering from the coordinator whether it is able to shut down). A simple example is enough to demonstrate (see Figure \ref{fig:incdep_lazydep_0}):
+
+\defNodes{O,A,B,S}
+
+\ndO (for \emph{Origin}) produces some number. If the number is odd, it is sent through \lstinline|output1| which is connected to \lstinline|input| of \ndA; if the number is even, it will be sent through \lstinline|output2| which is connected to \lstinline|input| of \ndB. \ndA and \ndB perform some calculation to the data they receive and send them to \ndS (both through their \lstinline|output| connection to the \lstinline|input| connection of \ndS). \ndB delays for some time (e.g. 2 seconds) before it can output data. \ndA finishes producing data immediately after producing the first unit of data. \ndS (for \emph{Sink}) does nothing but counting the number of units of data it receives.
+
+\begin{figure}[h]
+	\caption{•}
+	\label{fig:incdep_lazydep_0}
+\end{figure}
+
+Apparently \ndS should wait until \ndB propagates the \dEOS marker if \ndB is deployed; \ndS shouldn't wait for the \dEOS marker if \ndB is not deployed. The basic way of tackling this requirement is \ndS checks (\ie probe) whether it is safe to shut down when it receives an \dEOS marker and wait for the reply (\ie answer) to tell it whether it is true or not, which requires a round communication each time \ndS receives a \dEOS (using a counter doesn't help in this scenario because there is no guarantee when the signal to increase the counter will arrive).
+
+There are two options if we don't do probing and answering:
 \begin{enumerate}
-	\item Spawning nodes takes time, and the more nodes you spawn the more time it needs.
-	\item Some PEs may terminate earlier than others so actually the maximum number of nodes running simultaneously may be smaller than the number of PEs in the workflow (so some nodes will be spawned but never used).
+	\item Increase the to-be-waited number of nodes (by sending signals from the coordinator) for the input connections each time when a new node requires to output through a connection connected to that input connection.
+	\item Set the number of nodes to-be-waited to the total possible number of nodes in the beginning.
 \end{enumerate}
 
-Therefore, we expect to spawn nodes only when needed during running. MPI provides this mechanism by a function \lstinline|MPI_Comm_spawn()|. There is a configurable parameter which controls the number of nodes going to spawn at this time. The spawned nodes will be placed on a different \textit{intracommunicator} and connect with the existing nodes through an \textit{intercommunicator}. Because we want all executors to be able to communicate with each other and we may do the spawning for multiple times, we will also have to merge the \textit{intercommunicator} to a new \textit{intracommunicator} by using \lstinline|MPI_Intercomm_merge()|.
+If we choose method 1, if \ndB delays for a long time and then tries to send data through output connection to \ndS, \ndA will have already finished. In this scenario, the to-be-waited number in \ndS before \ndB requires to send data is \emph{1}, so when \ndA broadcasts \dEOS, \ndS finds the number of total nodes finished has reached \emph{1} so it shuts itself down. A naive, but faulty, patch for this will be set the to-be-waited number larger (e.g. add one) than the actual number, but this will fail when there are more than one nodes requiring to send data at the same time (and finishing sending data before the sink node has received the signals telling it to increase that to-be-waited number. The only way to solve the problem in this method is (with the counter add-by-one in the beginning) to make the coordinator tell the sink that there is another node who will send data to you and wait for \textit{ack} from the sink, which requires round communication between the coordinator and the sink each time for each input connection.
 
-Then, we will need to design the strategy of communication under the scenario of spawning and merging. The strategy can be chosen between these two ends:
-\begin{enumerate}
-	\item Switch from old communicator to new communicator every time the new a communicator is created. 
-	\item Use the old communicator whenever possible. 
-\end{enumerate}
+If we choose the second method, when a branch, \eg \ndB, is not (and will never be) deployed because of lazy deployment, the \ndS will never receive the \dEOS from \ndB so the counter will never reach the desired number so the shutdown propagation will fail. The only way to solve this dilemma is to make the coordinator aware when it is the time for \ndS to shut down and tell it to shut down. However, if we choose this approach, it requires more calculations in the coordinator side, which doesn't match our desire to keep the workload of coordinator minimal and will more easily make the coordinator a bottleneck, and there is no need to keep the shutdown propagation because the coordinator now takes control of everything.
 
-Our strategy choice is somewhat between these two: each communication channel always goes through the same \textit{communicator}; each every communication always uses the newest \textit{communicator}. 
+What we choose is to also deploy those \tPEInst{}s which are not deployed due to lazy deployment during shutdown propagation. We argue that this method won't create lots of overheads because the coordinator can re-assign these \tPEInst{}s to nodes which has previously shut down. We are aware that there is an extension to this approach which may significantly reduce the number of nodes deployed during the propagation process: do not deploy \tPEInst{}s (and their successors) whose successors (in any depths) will never have input connections connected with the output connections from other parts of the graph. However, because of the time limit, we didn't introduce this to our implementation.
+
+\section{Simple Example}
+Here we present a simple solid example to demonstrate how \tincdep works.
+
+Consider a graph doing some simple mathematical calculations like this (see Figure \ref{fig:incdep_example_0}):
+  
+\defNodes{A,B,C,D,E}
+
+\begin{itemize}
+	\item Two nodes \ndA and \ndB each produces some numbers.
+	\item Node \ndC splits the number by their sign: the positive ones go to node \ndD; the negative ones go to node \ndE.
+	\item Node \ndD sums all positive numbers together.
+	\item Node \ndE counts the number of data it receives.
+\end{itemize}
+
+\begin{figure}[h]
+	\caption{HERE IS A FIGURE TO ILLUSTRATE THE TOPOLOGY OF THE EXAMPLE}
+	\label{fig:incdep_example_0}
+\end{figure}
+
+\section{Implementation}
+The sections above all describe about the design of the logic, rather than the implementation. In this section, we describe the issues we encountered during implementation. We will first talk about our design of the extension to \dpy, and then present the issues we encountered in each relevant subsection.
+
+Because \tPEInst{}s are unaware of which node its input or output connections are connected to, they can't be executed plainly. The existing \dpy mechanism uses wrappers on each \tPEInst to handle the input, output and shutdown issues. We keep this design and do some extra work to make the wrapper run correctly under our extension.
+
+\Dpy supports a mechanism called ``grouping'' so we need also provide mechanisms to support it when implementing our extension in order to keep backward compatibility.
+
+\subsection{Efficiency, Concurrency, and Synchronization}
+Because all nodes are executed in parallel, the time when a signal or a unit of data will arrive is unpredictable. Therefore, we need to guarantee the correctness under all circumstances. 
+
+For example, when a \tPEInst is going to send a unit of data, it is possible that the reply from the coordinator returns immediately or it is also possible that the reply returns only after a long delay. Usually, sending data is a lot less computational-intensive than processing data. Therefore, it is usually more efficient to keep processing more data and leave the waiting and sending in concurrent.
+
+We use multi-threading to achieve concurrency in the wrapper of \tPEInst, and keep the design of each \tPEInst intact (they will usually be designed in a single-threaded manner); the coordinator is also change to multi-threaded for better performance.
+
+We can expect many communication to and from the coordinator run in parallel. Therefore, we will handle each request in a separate thread. Because multiple requests may act on a same PE, we will add a lock to each PE and acquire it when it is going to be act on (and release it when finished) so different requests of this same PE will be sequentialized.
+
+Because a wrapper reads data from some input connections, processes the data previously read in the \tPEInst it wraps and writes processed output to some output connections, we run ``read'' in one thread, and run ``process'' and ``write'' together in another thread. If the order of data doesn't matter, we will run both ``process'' and ``write'' in several threads (in a thread pool). Because we need also request the address of targets (successor nodes), we need to design a suitable place to handle the communication to the coordinator. We decide to send the request at where is needed, and listen in another dedicated thread. The synchronous will be done by using condition variables - wait for the condition variable to become true after sending the request, and set it to true when receiving the reply.
