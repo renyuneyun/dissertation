@@ -11,15 +11,6 @@ The other reason is that we expect to support a more natural way to design workf
 
 There is also another reason: we want to minimize the initialization cost for the execution of workflows and spawning, connecting and deploying nodes cost lots of resources, especially time. We expect doing all of spawning and deployment on-the-fly can save time in some cases.
 
-\defTerm{PETmpl}{PE template}
-\defTerm{PEInst}{PE}
-\defTerm{PEDup}{PE instance}
-
-\begin{tcolorbox}[enhanced,width=5.7in,size=fbox,
-    fontupper=\large\bfseries,drop shadow southwest,sharp corners]
-From this chapter on, we will describe into some details. It is useful that we distinguish between \tPETmpl{}s, \tPEInst{}s and \tPEDup{}s: a \tPETmpl is the logic (template) for processing data, usually implemented as a Python class; a \tPEInst is an instance (after construction) of such a class (\tPETmpl); \tPEDup is used only when we are talking about the duplications (which is an existing mechanism in \dpy) of the same \tPEInst. A \tPETmpl can be used to construct many different \tPEInst{}s and they can all behave differently because of, for example, the different parameters used to call the constructor. We will usually not talk about \tPEDup{}s unless we are precisely talking about that mechanism or the impact of it.
-\end{tcolorbox}
-
 \section{Deployment Behaviour}
 As \tincdep is the new extension we introduced, we shall first describe the expected behaviour of it as well as a brief comparison against the old system.
 
