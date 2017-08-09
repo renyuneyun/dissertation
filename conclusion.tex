@@ -1,0 +1,36 @@
+\chapter{Conclusion and Future Work}
+In this document, we presented the important role of scientific workflows for nowadays scientific researches, the classification to workflow management systems (WMSs) and \dpy, a data-streaming WMS, as the background information to our work. Then, we discussed two potential extensions, \tincdep and \tdynexp, to \dpy both will give \dpy more dynamics and enable further extensions or optimization and described our design and implementation of them. Finally, we presented our evaluation and measurement of our extension and showed that our extension can give \dpy more dynamics in a low cost and sometimes even with better performance.
+
+Apparently, we haven't reached the best performance of the work because there are some imperfect aspects in the implementation due to the time limitation. There are also some potential further work could be done built upon our current work. Even though, we consider we have made good work in the time limit of two months.
+
+\section{Future Work}
+The rest part of this chapter will describe possible future work. They consist of two aspects:
+\begin{enumerate}
+	\item Possible optimization to our current implementation;
+	\item Possible extension built upon our work.
+\end{enumerate}
+
+If we were allowed more time, we will explore the possible optimization first, and then the extension.
+
+\subsection{Possible Optimization}
+In our current implementation, there are some trade-offs (which have been briefly mentioned in the above chapters) because of the time limit. Given enough time, we will explore which way will be better and implement the best. We bring them together and describe a little further here:
+
+\begin{enumerate}
+	\item The \emph{process} and \emph{write} steps are combined together, and they are in parallel to the \emph{read} step during the processing of one \tPEInst. However, all them three can be executed in parallel in principle and, if needed, also satisfy the FIFO requirement by using coarse-grained scheduling or by using numbers.
+	\item When spawning more nodes, the current implementation always spawn a fixed pre-defined number of nodes. However, there may be a smart way to specify this number dynamically according to the workloads.
+	\item After spawning new nodes, the current implementation will merge all nodes together to one \emph{intracommunicator} in order to make all worker nodes inter-communicable. However, in MPI implementation, the merging operation takes time and during this time no data / message can be transmitted. We will call \lstinline|Comm.Dup()| to the merged \emph{intracommunicator}, which makes the time consumption even larger. We expect a better method to handle this process so working nodes don't have to wait.
+	\item When establishing communication between nodes, the current implementation use an \emph{existing or newest} manner (described in the \tIncDep chapter) to select MPI \emph{communicator}s. This behaviour is introduced because of dynamic spawning and is subject to change if point 3 is changed.
+\end{enumerate}
+
+\subsection{Possible Extension}
+We consider our work an important step towards further extension or optimization of \dpy. Here, we present some of the possible further extension or optimization based on our extension. \\
+
+\textbf{Dynamic scheduling}\quad
+When executing workflows, it is always better to try to deploy PEs to nodes nearby to reduce the time consumed for data transmission or to deploy more computation-intensive PEs to powerful nodes and less computation-intensive PEs to less powerful nodes. Therefore, it is useful to be able to deploy PEs to specific nodes according to performance data. Building upon our work, future development can gather data from both previous runs and current run. \\
+
+\textbf{Auto bundling}\quad
+The workload of different PEs are not balanced, meaning some PEs may have heavy computational jobs while some others may have very light ones. By bundling some light PEs together, the network traffic will become local data transmission so throughout will increase because local data transmission is always faster than network traffic. Moreover, less nodes are required so we may be able to utilize these free nodes to run more computation-intensive PEs to achieve better performance. \\
+
+\textbf{Separated Coordinator}\quad
+We use a single coordinator in our implementation, which may consequently become a bottleneck (either to communication or computation). We may analyse the workflow graph and identify separate regions (connected by one PE). Thus, we can assign each region one coordinator so each coordinator is only responsible for its region. This may be especially useful when the communication between worker nodes and the coordinator is expensive.
+

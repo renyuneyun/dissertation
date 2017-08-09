@@ -157,3 +157,30 @@ We use multi-threading to achieve concurrency in the wrapper of \tPEInst, and ke
 We can expect many communication to and from the coordinator run in parallel. Therefore, we will handle each request in a separate thread. Because multiple requests may act on a same PE, we will add a lock to each PE and acquire it when it is going to be act on (and release it when finished) so different requests of this same PE will be sequentialized.
 
 Because a wrapper reads data from some input connections, processes the data previously read in the \tPEInst it wraps and writes processed output to some output connections, we run ``read'' in one thread, and run ``process'' and ``write'' together in another thread. If the order of data doesn't matter, we will run both ``process'' and ``write'' in several threads (in a thread pool). Because we need also request the address of targets (successor nodes), we need to design a suitable place to handle the communication to the coordinator. We decide to send the request at where is needed, and listen in another dedicated thread. The synchronous will be done by using condition variables - wait for the condition variable to become true after sending the request, and set it to true when receiving the reply.
+
+\subsection{Spawning}
+One of the possibilities \tincdep gives \dpy is it allows to spawn more nodes when needed (\eg initial nodes are not enough). However, this behaviour also increases the complexity of the code.
+
+Three aspects are affected by supporting spawning:
+\begin{enumerate}
+	\item Determine and spawn new nodes.
+	\item Establish communication between existing and new nodes.
+	\item Select the right channel to transmit data / message.
+\end{enumerate}
+
+\subsubsection{Determine and Spawn}
+Determining when to spawn new nodes is fair easy: the coordinator simply checks if there are enough free nodes to be assigned the required \tPEInst{}s. If there aren't enough free nodes, it is very \textbf{likely} the coordinator needs to spawn more nodes. We emphasize the word \textbf{likely} because sometimes there is no need to spawn: for example, when the whole workflow is a line and the data is finite, the head node will finish so the coordinator can wait until its finishing and re-deploy next \tPEInst to it. However, this behaviour is not steady so we force the coordinator to spawn more nodes once a short-of-node happens.
+
+We need to ensure all nodes are communicable, so, under MPI specification, all nodes need to collectively spawn the new nodes. This involves a message transmission from the coordinator to make worker nodes aware there is a node to spawn and trigger the spawning function call.
+
+\subsubsection{Establish Communication}
+We expect all nodes (at least, all worker nodes) to be able to communicate with each other. We choose to merge the new \emph{Intercommunicator} created by the spawning process into one larger \emph{Intracommunicator}. In this way, we can use repeat the same behaviour for spawning more nodes though the newly created \emph{Intracommunicator}.
+
+To suit the existing grouping mechanism, which is introduced to increase throughout by (automatically) deploying \tPEDup{}s of the same \tPEInst and processing data in parallel, we use local leaders (called \textbf{representative}) for each group. The representative is responsible for synchronization between groups.
+
+As a result, we use three sets of communicators: one for data transmission, one for communication between the coordinator and the worker nodes and one for communication inside each group. We use \lstinline|Comm.Dup()| to achieve this goal, which is a compromise because of the time limit.
+
+\subsubsection{Channel Selection}
+Because of the introduction of dynamic node spawning and communicator merging, more MPI communicators are created. If an old node needs to communicate with a new node, it must use the newest communicator. However, the order of messages need to be guaranteed for shutdown propagation, so we can't switch directly from an old communicator to a new one. The situation is even more complicated when we consider the other two sets of communicators.
+
+We use an \emph{existing or newest} concept to select the communicator: if a communicator between two nodes is already been used, then future communications all go through that communicator; if no communicator is using between two nodes, then we select the newest one; for communication between worker nodes and coordinator, we keep using the existing communicator during the worker working, and switch to the newest when it's free; for communication inside group, we use the newest communicator when deploying nodes of that group.
