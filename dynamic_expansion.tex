@@ -1,1 +1,38 @@
 \chapter{Dynamic Expansion}
+In this chapter, we describe further why we introduce \tdynexp, and present how we design this feature. After that, we describe how to construct \tsieve in \tdynexp and finally present the problem we encounter during implementing \tdynexp.
+
+We described \tsieve in the Use Cases chapter and it is our main motivation to allow developers to construct workflows like that more naturally and universally. By introducing \tdynexp, we expect to allow developers to design \tPETmpl{}s which are elastic according to actual needs while keeping backward compatibilities with the existing \dpy mechanism.
+
+\section{PE Definition}
+To introduce the dynamics, we need to add some extra mechanisms to the definition of PEs (\ie \tPETmpl{}s). We now present the general need, followed by our implementation.
+
+In general, each PE should decide whether to \textit{expand} or not when receiving and processing data. We use the term \textit{expand} to limit this dynamics to a handleable range or the range will explode. By saying \textit{expand}, we expect each PE behave like cell division, to split to another almost the same PE, when the mechanism is triggered, and we limit this mechanism to trigger at most once for each expandable condition each PE (and the divisional PE will be treated as if it is a PE defined in the workflow so it can still \textit{expand}).
+
+Although we limit this mechanism to \textit{expand} for our prototype system, it is capable to accomplish the design of \ttsieve as well as other workflows containing a similar behaviour. Moreover, by combining the expansion behaviour with the mechanism used to bundle multiple PEs together to form a large PE (which is an unnamed mechanism in \dpy), developers can design more complex expansion behaviours.
+
+In the above discussion, we deliberately blurred the difference between \tPETmpl and \tPEInst for simplicity, and we believe this won't cause confusion for readers.
+
+To implement \tdynexp, we add two more features to the definition of each PE (\tPETmpl):
+
+\defTerm{circuit}{circuit}
+
+\begin{enumerate}
+	\item A \textbf{property} used to inform the coordinator (and the developer) whether this PE (\tPETmpl) is expandable or not. \\
+	This is implemented as a read-only property called \lstinline|repeatable| in the definition of PE, and defaults to \lstinline|False|. The developer only needs to override this property to \lstinline|True| when designing an expandable PE.
+	\item A \textbf{mechanism} used to control when to trigger the expansion and how to communicate to the expanded PE. \\
+	We add a special type of output connections called ``\tcircuit''. Each \tcircuit is a pair of connections (one input and one output), both defined in the same \tPETmpl. When the PE sends data through an output connection defined in the \tcircuit, the expansion mechanism is trigger, a division is deployed and the data is sent to the paired input connection in the \tcircuit. This \tcircuit then becomes a static connection, meaning this (old) PE can keep sending more data through this output connection and no more division will be triggered.
+\end{enumerate}
+
+\section{Runtime Behaviour}
+The section above described how \tdynexp is designed in the PE part, and briefly mentioned the meaning of each of these features. This section describe how these features are expected to work during runtime, and then describe it in our implementation, mainly from the perspective of the coordinator.
+
+An expandable PE (\emph{origin}) sends sends a signal containing the \tcircuit output connection. The system recognizes this is a request for expansion, prepares the divisional PE (which is almost a ``duplication'' to the PE (\emph{origin}), with extra configurations) and deploy the divisional PE so the \emph{origin} can subsequently communicate with the divisional PE.
+
+Our implementation builds on top of \tincdep, and utilize many of its features. In our implementation, an expandable PE outputs data through a \tcircuit output connection using the same way as other output connections -- sending a signal to the coordinator. The coordinator checks if the PE(\emph{origin} is expandable, and then checks if the output connection is an output connection defined in \tcircuit. If both true, the coordinator will create a duplication to the PE (\emph{origin}), and deploy it to a node, using the same way as a common \tincdep.
+
+To avoid confusion, when sending the ID of PE to a node during deployment, the divisional PE will contain a separate field with an increasing integer count. When the node receives this message, it extracts the PE ID part to obtain the PE, and ignores the other part (\ie the counter) in the current implementation.
+
+\section{Simple Example}
+In this section, we use \ttsieve as our example to show the difference of the semantics before and after implementing \tdynexp.
+
+TO BE CONSTRUCTED

@@ -1,4 +1,4 @@
-\chapter{Use cases}
+\chapter{Use Case}
 We present here two examples that are used to explore the semantics and performance of \dpy. We require to retain all prior semantic interpretations of workflows but introduce new ones that depend on dynamic determination of the generated graph.
 
 We will introduce them separately in the hope that it is more clear to read.
@@ -34,3 +34,4 @@ Both of them are quite unsatisfying for researchers / developers because they bo
 This motivates our research and we present the new semantics called \emph{dynamic expansion} (in addition to \emph{incremental deployment}) to support this expectation. In the new semantics, we no longer need to manually assign many sieves. Instead, we only need to define the \cdSieve automatically expandable (by setting the \lstinline|repeatable| property to \lstinline|True|) and describe when to expand it (by connecting \lstinline|circuit|). Moreover, in our new system, another new use case is available: to find certain number of primes - by making the \cdSieve nodes aware of their status and no longer expand more sieves (it will be more efficient if \emph{backward shut-down propagation} is implemented). Details will be described in the Dynamic Expansion chapter.
 
 \section{Seismic cross-correlation}
+(TO BE CONSTRUCTED)

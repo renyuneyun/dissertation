@@ -88,6 +88,7 @@ By using this method, all nodes will be guaranteed to shut down correctly when t
 But we'd like the coordinator to be aware of the status of all nodes so it can re-deploy other \tPEInst{}s to a node which has previously shut down so the resources will be better used. Therefore, we add an additional signal to tell the coordinator that a node is shutting down now. When the coordinator receives this signal, it then marks the signal source as free so the coordinator can re-deploy other \tPEInst{}s to it.
 
 \section{Backward Shutdown Propagation}
+TO BE CONSTRUCTED
 
 \section{Lazy Deployment}
 Lazy deployment is not a specially designed feature, but a natural feature emerged during the implementation of \tincdep.
@@ -103,7 +104,9 @@ Because of the existence of lazy deployment, it seems the behaviour of shutdown 
 \ndO (for \emph{Origin}) produces some number. If the number is odd, it is sent through \lstinline|output1| which is connected to \lstinline|input| of \ndA; if the number is even, it will be sent through \lstinline|output2| which is connected to \lstinline|input| of \ndB. \ndA and \ndB perform some calculation to the data they receive and send them to \ndS (both through their \lstinline|output| connection to the \lstinline|input| connection of \ndS). \ndB delays for some time (e.g. 2 seconds) before it can output data. \ndA finishes producing data immediately after producing the first unit of data. \ndS (for \emph{Sink}) does nothing but counting the number of units of data it receives.
 
 \begin{figure}[h]
-	\caption{•}
+\centering
+    \includegraphics[width=0.8\textwidth]{figures/incdep_lazydep_0}
+	\caption{Example figure for illustration in lazy deployment}
 	\label{fig:incdep_lazydep_0}
 \end{figure}
 
@@ -141,6 +144,8 @@ Consider a graph doing some simple mathematical calculations like this (see Figu
 \end{figure}
 
 \section{Implementation}
+(NEEDS REVISION)
+
 The sections above all describe about the design of the logic, rather than the implementation. In this section, we describe the issues we encountered during implementation. We will first talk about our design of the extension to \dpy, and then present the issues we encountered in each relevant subsection.
 
 Because \tPEInst{}s are unaware of which node its input or output connections are connected to, they can't be executed plainly. The existing \dpy mechanism uses wrappers on each \tPEInst to handle the input, output and shutdown issues. We keep this design and do some extra work to make the wrapper run correctly under our extension.
