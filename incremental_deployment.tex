@@ -58,7 +58,7 @@ When the coordinator knows the successor \tPEInst{}s, it will need to deploy the
 During the lookup, if there is no enough nodes available (free), the coordinator will spawn more nodes and try again. We can use different strategies to decide the number of nodes to be spawned, but we only use a constant for now.
 
 \section{Coordinator}
-The above two sections only talked about the general role of the coordinator. In this section, we present the actual behaviour of the coordinator during deployment.
+The sections above only talked about the general role and some concrete aspects of the coordinator. In this section, we present how the coordinator works when handling its main job.
 
 The coordinator first performs a topological sorting to the workflow graph in the beginning, and stores which output connection (and the \tPEInst) is connected with which input connection in a quick lookup table (hash table). It then deploys the source nodes which have no input connections (\ie zero in-degree). The coordinator stores a record (array) which keeps the status of every execution nodes, to track whether they are busy (has a \tPEInst deployed deployed at the moment) or free (has no \tPEInst deployed at the moment), and also the \tPEInst each busy node is running.
 Then, the coordinator waits for signals (\ie communications) from the execution nodes after sources are deployed.
@@ -86,9 +86,6 @@ We used an attributive, ``enough'', for correctness in case an input connection 
 By using this method, all nodes will be guaranteed to shut down correctly when there is no more job to do and therefore no more data to produce. We keep this behaviour in our extension (with one difference which will be described in the Lazy Deployment section) so the coordinator doesn't need to propagate shutdown signals.
 
 But we'd like the coordinator to be aware of the status of all nodes so it can re-deploy other \tPEInst{}s to a node which has previously shut down so the resources will be better used. Therefore, we add an additional signal to tell the coordinator that a node is shutting down now. When the coordinator receives this signal, it then marks the signal source as free so the coordinator can re-deploy other \tPEInst{}s to it.
-
-\section{Backward Shutdown Propagation}
-TO BE CONSTRUCTED
 
 \section{Lazy Deployment}
 Lazy deployment is not a specially designed feature, but a natural feature emerged during the implementation of \tincdep.
@@ -127,41 +124,75 @@ What we choose is to also deploy those \tPEInst{}s which are not deployed due to
 \section{Simple Example}
 Here we present a simple solid example to demonstrate how \tincdep works.
 
-Consider a graph doing some simple mathematical calculations like this (see Figure \ref{fig:incdep_example_0}):
+Consider a graph doing some simple mathematical calculations like this (illustrated in Figure \ref{fig:incdep_example_0}):
   
 \defNodes{A,B,C,D,E}
 
 \begin{itemize}
-	\item Two nodes \ndA and \ndB each produces some numbers.
-	\item Node \ndC splits the number by their sign: the positive ones go to node \ndD; the negative ones go to node \ndE.
-	\item Node \ndD sums all positive numbers together.
-	\item Node \ndE counts the number of data it receives.
+	\item Two PEs \ndA and \ndB each produces some numbers.
+	\item PE \ndC splits the number by their sign: the positive ones go to PE \ndD; the negative ones go to PE \ndE.
+	\item PE \ndD sums all positive numbers together.
+	\item PE \ndE counts the number of data it receives.
 \end{itemize}
 
-\begin{figure}[h]
-	\caption{HERE IS A FIGURE TO ILLUSTRATE THE TOPOLOGY OF THE EXAMPLE}
+\begin{figure}[h]\centering
+    \includegraphics[width=0.8\textwidth]{figures/incdep_example_0}
+	\caption{Workflow design}
 	\label{fig:incdep_example_0}
 \end{figure}
 
+Without \tincdep, \dpy analyses the whole workflow and deploy all nodes once for all in the beginning. But everything goes in to incremental steps under \tincdep:
+
+\begin{enumerate}
+	\item When initializing, the coordinator is the first initialized and all other nodes are seen as worker nodes which wait for signals from the coordinator by default. The coordinator analyses the workflow, and deploy the first two PEs, \ndA and \ndB.
+	\item After deployment, PEs \ndA and \ndB start producing data. Suppose \ndA produces the first unit of data earlier than \ndB. \ndA sends the request with the name of the output, \lstinline|output|, to the coordinator.
+	\item The coordinator receives the request, checks and finds \ndC hasn't been deployed. It then deploys \ndC to a free node, say, node 3.
+	\item Suppose during this time, the request from \ndB comes to the coordinator. The coordinator knows it is handling the deployment of \ndC, so it simple waits until the completions of the deployment of \ndC.
+	\item After deployment, the coordinator sends back the target for the output, \lstinline|output|, of \ndA, and does the same for \ndB.
+	\item When A (or B) is producing more data from it output connection \lstinline|output|, it knows it already has the destination, so it won't communicate with the coordinator again.
+	\item When \ndC is sending data through output \lstinline|output1| for the first time (suppose \ndC produces data first through \lstinline|output1|), it sends the signal to the coordinator to request the destinations of \lstinline|output1|. Then, \ndD is deployed by the coordinator, and the reply sends back to \ndC.
+	\item Similar thing happens for \lstinline|output2| of \ndC.
+\end{enumerate}
+
+The steps are illustrated in a series of pictures (see Figure \ref{fig:incdep_example_steps}). After all request and replies, all nodes are deployed and no duplication will occur. If, for example, output connection \lstinline|output2| of \ndC is never used, \ndE will not be deployed during processing (but, in our implementation, will be deployed when propagating the \dEOS marker as described above).
+
+\begin{figure}[h]\centering
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_1}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_2}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_2_5}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_3}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_4}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_5}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_6}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_7}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_8}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_9}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_10}
+    \includegraphics[width=0.4\textwidth]{figures/incdep_example_all}
+	\caption{Communication at each time slice}	\label{fig:incdep_example_steps}
+\end{figure}
+
 \section{Implementation}
-(NEEDS REVISION)
+The sections above described the design of the logic, with only a few about the implementation. In this section, we describe the issues we encountered during implementation. We first talk about our design of the extension to \dpy, and then present some issues we encountered in each relevant subsection.
 
-The sections above all describe about the design of the logic, rather than the implementation. In this section, we describe the issues we encountered during implementation. We will first talk about our design of the extension to \dpy, and then present the issues we encountered in each relevant subsection.
+Because \tPEInst{}s are unaware of which node its input or output connections are connected to, they can't be executed plainly -- some mechanisms need to handle data transmission. The existing \dpy mechanism uses wrappers on each \tPEInst to handle the input, output and shutdown issues. We kept this design and did some extra work to make the wrapper run correctly under our extension. Details are described in see \ref{ssec:incdep_ecs}.
 
-Because \tPEInst{}s are unaware of which node its input or output connections are connected to, they can't be executed plainly. The existing \dpy mechanism uses wrappers on each \tPEInst to handle the input, output and shutdown issues. We keep this design and do some extra work to make the wrapper run correctly under our extension.
+The existing \Dpy code supports a mechanism called ``grouping'' so we need also provide mechanisms to support it when implementing our extension in order to keep backward compatibility. To support grouping, we introduce representatives to each group for synchronization (see \ref{ssec:incdep_ecs}).
 
-\Dpy supports a mechanism called ``grouping'' so we need also provide mechanisms to support it when implementing our extension in order to keep backward compatibility.
+All these designs are based on ordered messages between each pair of nodes, which is guaranteed by the MPI specification.
 
-\subsection{Efficiency, Concurrency, and Synchronization}
+\subsection{Efficiency, Concurrency, and Synchronization} \label{ssec:incdep_ecs}
 Because all nodes are executed in parallel, the time when a signal or a unit of data will arrive is unpredictable. Therefore, we need to guarantee the correctness under all circumstances. 
 
-For example, when a \tPEInst is going to send a unit of data, it is possible that the reply from the coordinator returns immediately or it is also possible that the reply returns only after a long delay. Usually, sending data is a lot less computational-intensive than processing data. Therefore, it is usually more efficient to keep processing more data and leave the waiting and sending in concurrent.
+For example, when a \tPEInst is going to send a unit of data, it is possible that the reply from the coordinator returns immediately but it is also possible that the reply returns only after a long delay. Usually, handling data transmission is a lot less computational-intensive than processing data. Therefore, it would be more efficient to keep processing more data and leave the waiting and sending in concurrent.
 
-We use multi-threading to achieve concurrency in the wrapper of \tPEInst, and keep the design of each \tPEInst intact (they will usually be designed in a single-threaded manner); the coordinator is also change to multi-threaded for better performance.
+We use multi-threading to achieve concurrency in the wrapper of \tPEInst, and keep the design of each \tPEInst intact (they will usually be designed in a single-threaded manner, which means calls to the \lstinline|process| method is not guaranteed to be thread-safe); similarly, the coordinator is also change to multi-threaded for better performance.
 
-We can expect many communication to and from the coordinator run in parallel. Therefore, we will handle each request in a separate thread. Because multiple requests may act on a same PE, we will add a lock to each PE and acquire it when it is going to be act on (and release it when finished) so different requests of this same PE will be sequentialized.
+We can expect many communication to and from the coordinator run in parallel. Therefore, we will handle each request in a separate thread. Because multiple requests may act on a same PE, we will add a lock to each PE and acquire it when it is going to be act on (and release it when finished). Thus different requests of this same PE will be sequentialized, so no duplicated deployment will happen.
 
-Because a wrapper reads data from some input connections, processes the data previously read in the \tPEInst it wraps and writes processed output to some output connections, we run ``read'' in one thread, and run ``process'' and ``write'' together in another thread. If the order of data doesn't matter, we will run both ``process'' and ``write'' in several threads (in a thread pool). Because we need also request the address of targets (successor nodes), we need to design a suitable place to handle the communication to the coordinator. We decide to send the request at where is needed, and listen in another dedicated thread. The synchronous will be done by using condition variables - wait for the condition variable to become true after sending the request, and set it to true when receiving the reply.
+Because a wrapper reads data from some input connections, processes the data previously read in the \tPEInst it wraps and writes processed output to some output connections, we run ``read'' in one thread, and run ``process'' and ``write'' together in another thread. We are aware that making ``process'' and ``write'' separated and all ``write''s in parallel may very likely achieve better performance, but we didn't implement it because of the time limit. Because we need also request the address of targets (successor nodes), we need to design a suitable place to handle the communication to the coordinator. We decide to send the request at where is needed, and listen in another dedicated thread. The synchronous will be done by using condition variables - wait for the condition variable to become true after sending the request, and set it to true when receiving the reply.
+
+We introduced local leaders (called \emph{representative}s) for each group to keep compatibility of the grouping mechanism. The representative is responsible for synchronization between groups. When a non-representative node wants to terminate its processing because of the shutdown propagation, it waits for all its data has been received and informs it representative that it is going to shutdown. After informing the representative, it informs the coordinator and then shutdown and return to the listening state. When the representative knows all nodes in its group is going to shutdown, it propagates the \dEOS marker to all proceedings and shuts itself down (as well as informing the coordinator). It is more nature to let the representative to wait for the finish of all data transmissions, but this is not possible in MPI. The only way to ensure all data from a group has been received by the receiver is to use \lstinline|Issend()| and perform a \lstinline|Waitall()| to all \lstinline|Request| objects returned by (every call of) the \lstinline|Issend()| function.
 
 \subsection{Spawning}
 One of the possibilities \tincdep gives \dpy is it allows to spawn more nodes when needed (\eg initial nodes are not enough). However, this behaviour also increases the complexity of the code.

@@ -36,5 +36,8 @@ The workload of different PEs are not balanced in nature, meaning some PEs may h
 \textbf{Regionalized coordinator}\quad
 We use a single coordinator in our implementation, which may consequently become a bottleneck (either to communication or computation). Some properties of the specific workflow graph may be useful to ease this constraint: we may analyse the workflow graph and identify separate regions (\eg connected by one PE) and assign each region one coordinator so each coordinator is only responsible for its region. This may be especially useful when the communication between worker nodes and the coordinator is expensive. \\
 
+\textbf{Pre-deployment}\quad
+It takes time from identifying the needs to deploy a PE to be aware the PE has been deployed. It may be better to deploy PEs previous to a corresponding request. However, whether this will contribute to reducing the total time or not is unknown before actually implementing it, and it is also unknown, though with some heuristics (\eg one step prior), how to identify which PEs to deploy.
+
 \textbf{Dynamic construction}\quad
 In the current \dpy semantics, PEs are constructed before the execution of the workflow. It violates the semantics if the system modifies the PEs, and forces us to design \tdynexp as it is now. However, if we can construct PEs or at least modify some of its properties (in an approved explicit way) during runtime, we can make the dynamics of \tdynexp more robust - by changing the parameters used to construct the divisional PE to change its behaviour (from the coordinator side), rather than by message passing between PEs. This may be especially useful if we want to apply the existing grouping mechanism to expandable PEs.
