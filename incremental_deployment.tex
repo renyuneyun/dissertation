@@ -3,11 +3,11 @@
 \newcommand{\defNodes}[1]{\forcsvlist{\defNode}{#1}}
 
 \chapter{Incremental Deployment}
-In this chapter, we present the \tincdep we introduced for further extension or optimisation of \dpy. We first present why we introduce \tincdep. After that, each section of this chapter contains one main aspect of \tincdep, including the expected behaviour of \tincdep, the semantics changes due to \tincdep and how \tincdep works, except for the last two sections - the second last section presents an example of \tincdep, and the last section presents how we implement \tincdep in \dpy (including what issues we encountered and how we solved them).
+In this chapter, we present the \tincdep we introduced for further extension or optimisation of \dpy. We first briefly restate why we introduce \tincdep and our expectation of \tincdep. After that, each section of this chapter contains one main aspect of \tincdep, including the expected behaviour of \tincdep, the semantics changes due to \tincdep and how \tincdep works, except for the last two sections - the second last section presents an example of \tincdep, and the last section presents how we implement \tincdep in \dpy (including what issues we encountered and how we solved them).
 
 We expect, as said in the Background chapter, future researchers would need to design workflows reading data from continuous infinite, on the basis of units, data sources. In this situation, the execution time of the workflow will also be infinite unless manually shut down. Therefore, it is infeasible to use past performance data from an ``infinite workflow'' to guide the deployment of future runs of the same workflow. A more dynamic on-the-fly way of deploying PEs to nodes is needed to support possible optimisations. This is one of the reasons we introduce \tincdep.
 
-The other reason is that we expect to support a more natural way to design workflows to accomplish tasks such as the \tsieve we discussed in the Use Case chapter. Details of why we need \tincdep to support it will be discussed in \tDynExp chapter.
+The other reason is that we expect to support a more natural way to design workflows to accomplish tasks such as the \tsieve we discussed in \ref{sec:uc_sieve}. Details of why we need \tincdep to support it will be discussed in the \rcpt{Dynamic Expansion} chapter.
 
 There is also another reason: we want to minimize the initialization cost for the execution of workflows and spawning, connecting and deploying nodes cost lots of resources, especially time. We expect doing all of spawning and deployment on-the-fly can save time in some cases.
 
@@ -37,11 +37,11 @@ To put all these together, the deployment behaviour now is:
 \end{enumerate*}
 
 \section{Revised Semantics for Sending Data}
-We briefly mentioned when sending data through an output connection, the coordinator is responsible for deploying the successor \tPEInst{}(s). Here we present how the semantics for sending data has changed and how this is reflected in out implementation of sending data.
+We briefly mentioned when sending data through an output connection, the coordinator is responsible for deploying the successor \tPEInst{}(s). Here we present how the semantics for sending data has changed and how this is reflected in our implementation of sending data.
 
 In the old \dpy system, because all \tPEInst{}s are deployed in the beginning, all nodes are completely aware with which input connection of which node is an output connection connected. As a result, when an output is produced, the node knows naturally where it will go to. However, because \tPEInst{}s are deployed dynamically when we introduce \tincdep, all nodes lose this knowledge so this semantics is subject to change.
 
-In \tincdep, when a \tPEInst produces a unit of data and sends it through an output connection, this action triggers a lookup to find the correct targets (both input connections and nodes). If the targets haven't been deployed yet, the send action will hang up to wait for the completion of the deployment (which is performed by the coordinator) of the targets and then the send action proceeds.
+In \tincdep, when a \tPEInst produces a unit of data and sends it through an output connection, this action triggers a lookup to find the correct targets (both input connections and nodes). If the targets have not been deployed yet, the send action will hang up to wait for the completion of the deployment (which is performed by the coordinator) of the targets and then the send action proceeds.
 
 In our implementation, when a \tPEInst produces a unit of data, the node (which runs the \tPEInst) will communicate with the coordinator to request the destination(s) of the output connection. Then it waits for the reply from the coordinator to tell it where that data should be sent to. When it receives the reply, it caches the information (reply) and when next time it is going to send data through the same output connection, it will use the cached information instead of communicating with the coordinator a second time. 
 The deployment strategy and process is hidden to the execution nodes, so their main job is still executing the \tPEInst.
@@ -60,7 +60,7 @@ During the lookup, if there is no enough nodes available (free), the coordinator
 \section{Coordinator}
 The sections above only talked about the general role and some concrete aspects of the coordinator. In this section, we present how the coordinator works when handling its main job.
 
-The coordinator first performs a topological sorting to the workflow graph in the beginning, and stores which output connection (and the \tPEInst) is connected with which input connection in a quick lookup table (hash table). It then deploys the source nodes which have no input connections (\ie zero in-degree). The coordinator stores a record (array) which keeps the status of every execution nodes, to track whether they are busy (has a \tPEInst deployed deployed at the moment) or free (has no \tPEInst deployed at the moment), and also the \tPEInst each busy node is running.
+The coordinator first performs a topological sorting to the workflow graph in the beginning, and stores which output connection (and the \tPEInst) is connected with which input connection in a quick lookup table (\eg a hash table). It then deploys the source nodes which have no input connections (\ie zero in-degree). The coordinator stores a record (array) which keeps the status of every execution nodes, to track whether they are busy (has a \tPEInst deployed deployed at the moment) or free (has no \tPEInst deployed at the moment), and also the \tPEInst each busy node is running.
 Then, the coordinator waits for signals (\ie communications) from the execution nodes after sources are deployed.
 
 During waiting, when the coordinator receives a signal which requires the successors of an output connection, it lookups what input connections and \tPEInst{}s are connected with this output connection, and then checks each of the \tPEInst{}s in the record to see if it is already deployed. For each of those undeployed \tPEInst{}s, the coordinator will deploy it to a node and record this deployment. After all these \tPEInst{}s are deployed, the coordinator replies the requester with the input connections and the nodes where these \tPEInst{}s are deployed.
@@ -70,7 +70,7 @@ It is apparent that there is no need for a node to request for the successors of
 When deploying the \tPEInst, the coordinator sends the information necessary for a node to construct the \tPEInst. In our implementation, we assign an unique ID for each \tPEInst in the workflow and all nodes possess the knowledge of the workflow. Therefore, the coordinator simply sends the ID of the target \tPEInst to the node and the node directly looks up the \tPEInst in the workflow and execute it. We can think of an alternative method which may be more flexible: send instructions/information necessary to construct the \tPEInst from \tPETmpl to the target node (and also adjust the workflow not to directly use \tPEInst{}s but to use construction information of every \tPEInst{}), so the coordinator can modify these instructions/information if needed. However, because we are constrained by time, we only implemented a backward-compatible method.
 
 \section{Shutdown Process}
-The execution should be able to begin, and should also be able to shutdown properly. In this chapter, we describe how the shutdown process works.
+The execution should be able to begin, and should also be able to shutdown properly. In this section, we describe how the shutdown process works.
 
 \newcommand{\dEOS}{end-of-stream\xspace}
 
@@ -92,7 +92,7 @@ Lazy deployment is not a specially designed feature, but a natural feature emerg
 
 As the process of deployment shows, the existing \dpy system will deploy all \tPEInst{}s to all nodes. However, because of the variety and uncertainty of incoming data, sometimes some \tPEInst may never receive any units of data. Therefore, it is not needed to deploy them to nodes. If this is a whole branch of the workflow (because of, \eg, this branch is for debugging), by not deploying these \tPEInst{}s, many nodes can be saved.
 
-With the existence of lazy deployment, \tPEInst{}s will be deployed only if they are needed. This behaviour is the same behaviour of the deployment strategy of \tincdep - that's why we say lazy deployment is naturally emerged.
+With the existence of lazy deployment, \tPEInst{}s will be deployed only if they are needed. This behaviour is the same behaviour of the deployment strategy of \tincdep -- that is why we say lazy deployment is naturally emerged.
 
 Because of the existence of lazy deployment, it seems the behaviour of shutdown propagation should be changed slightly. The most natural way for propagating the shutdown signal is: each \tPEInst still propagates the \dEOS signal to all output connections, but only those output connections which has successors deployed will actually send out the \dEOS signal, in order not to trigger a deployment. However, because we need a counter to count for the number of \dEOS{}s from all input connections in order to guarantee the propagation works correctly in the presence of multi-to-one connections, we need another mechanism to guarantee the counter works correctly in lazy deployment. We argue that it is impossible, in a distributed asynchronous system, to guarantee the counter works correctly without doing round communications with the coordinator (\eg, probing to and answering from the coordinator whether it is able to shut down). A simple example is enough to demonstrate (see Figure \ref{fig:incdep_lazydep_0}):
 
