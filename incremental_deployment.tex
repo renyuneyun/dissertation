@@ -121,7 +121,7 @@ If we choose the second method, when a branch, \eg \ndB, is not (and will never 
 
 What we choose is to also deploy those \tPEInst{}s which are not deployed due to lazy deployment during shutdown propagation. We argue that this method won't create lots of overheads because the coordinator can re-assign these \tPEInst{}s to nodes which has previously shut down. We are aware that there is an extension to this approach which may significantly reduce the number of nodes deployed during the propagation process: do not deploy \tPEInst{}s (and their successors) whose successors (in any depths) will never have input connections connected with the output connections from other parts of the graph. However, because of the time limit, we didn't introduce this to our implementation.
 
-\section{Simple Example}
+\section{Simple Example} \label{sec:incdep_example}
 Here we present a simple solid example to demonstrate how \tincdep works.
 
 Consider a graph doing some simple mathematical calculations like this (illustrated in Figure \ref{fig:incdep_example_0}):

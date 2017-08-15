@@ -32,7 +32,7 @@ Our implementation builds on top of \tincdep, and utilize many of its features. 
 
 To avoid confusion, when sending the ID of PE to a node during deployment, the divisional PE will contain a separate field with an increasing integer count. When the node receives this message, it extracts the PE ID part to obtain the PE, and ignores the other part (\ie the counter) in the current implementation.
 
-\section{Simple Example}
+\section{Simple Example} \label{sec:dynexp_example}
 In this section, we use \ttsieve as our example to show the difference of the semantics before and after implementing \tdynexp.
 
 We have described the structure of \ttsieve in \ref{sec:uc_sieve} (see also Figure \ref{fig:sieve_static}). If we want to construct it in the original version of \dpy, we need to estimate the number of sieves to construct the workflow. For example, if we want to know the primes up to 100, we need to assign at least 26 sieve PEs. Listing \ref{lst:wf_sieve} gives an example code to construct this workflow.
@@ -140,3 +140,5 @@ class RepeatablePE(GenericPE):
     def get_circuit_outputs(self):
         return list(self._circuit.keys())
 \end{lstlisting}
+
+Using these definitions, the workflow in the new semantics is more universal than that in the old semantics. Although it seems the \lstinline|IntegerProducer| still needs to be changed when changing the maximum number, this is indeed the issue of our implementation choice -- instead of a PE with a pre-defined range, we can use a producer PE which reads from commandline arguments or a file to get the number range. We use this pre-defined kind of PEs here in order to better present the design and meaning of the workflow.
