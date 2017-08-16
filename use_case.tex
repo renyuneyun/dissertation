@@ -36,4 +36,35 @@ Both of them are quite unsatisfying for researchers / developers because they bo
 This motivates our research and we present the new semantics called \emph{dynamic expansion} (in addition to \emph{incremental deployment}) to support this expectation. In the new semantics, we no longer need to manually assign many sieves. Instead, we only need to define the \cdSieve automatically expandable (by setting the \lstinline|repeatable| property to \lstinline|True|) and describe when to expand it (by connecting \lstinline|circuit|). Moreover, in our new system, another new use case is available: to find certain number of primes - by making the \cdSieve nodes aware of their status and no longer expand more sieves (it will be more efficient if \emph{backward shut-down propagation} is implemented). Details will be described in the Dynamic Expansion chapter.
 
 \section{Seismic cross-correlation}
-(TO BE CONSTRUCTED)
+Cross-correlation is a method used in seismology to process data from the observers (\eg sensors from stations) by comparing (\ie making calculations of) data of each pair of sensors / sources / stations. Performing cross-correlation is unavoidable for the development of many reliable seismic risk assessment methods \cite{doi:10.1177/1094342016649766}.
+
+\begin{figure}[h]
+\centering
+    \includegraphics[width=0.8\textwidth]{figures/wf_xcorr}
+\caption{Illustration of the cross-correlation workflow by \citeauthor{doi:10.1177/1094342016649766}\cite{doi:10.1177/1094342016649766}}
+\label{fig:wf_xcorr}
+\end{figure}
+
+\citeauthor{doi:10.1177/1094342016649766}\cite{doi:10.1177/1094342016649766} presented an illustration (see Figure \ref{fig:wf_xcorr}) to the structure of the cross-correlation (xcorr) workflow. Apart from the reading and writing of files, it contains two steps: preprocess and cross-correlation. The preprocess step reads data from stations and performs some preprocess. The raw data is very large but the preprocessed data is smaller than that. Each trace (data from one station) can be preprocessed independently, and the preprocessed data are fed into many cross-correlations PEs.
+
+Because the preprocess step requires online station data, it is better for us to cache the data on local disks when performing evaluation. Because the raw data amount is large, we cache the preprocessed data on local disks and only performs the cross-correlation step to evaluate the performance. This does not affect the ability to demonstrate because cross-correlation is also highly parallelizable -- it performs actions on each pair of stations so the total number of cross-correlation (independent with each other) is $C^2_n$ \footnote{Also denoted as $\binom{n}{k}$.} for $n$ traces where $C^k_n$ represents the number of $k$ combinations in $n$ elements, and hence $C^2_n=\frac{n(n-1)}{2}$.
+
+The workflow \footnote{Originates from \url{https://github.com/rosafilgueira/dispel4py_workflows}.} we use consists of four \tPETmpl{}s and can be decomposed into two partitions (see Figure \ref{fig:wf_xcorr_us}). The four \tPETmpl{}s are:
+
+\begin{figure}[h]
+\centering
+    \includegraphics[width=0.8\textwidth]{figures/wf_xcorr_us}
+\caption{Illustration of the cross-correlation workflow we use}
+\label{fig:wf_xcorr_us}
+\end{figure}
+
+\begin{enumerate}
+	\item \lstinline|Producer| which reads (pre-processed) data from disk and stream them to \lstinline|XCorr|.
+	\item \lstinline|XCorr| reads data and performs cross-correlation until no more data coming in. It sends the processed data to both \lstinline|Store| and \lstinline|Plot|.
+	\item \lstinline|Store| saves data to disk.
+	\item \lstinline|Plot| produces a plot (to the disk) of the data.
+\end{enumerate}
+
+Each \lstinline|XCorr| is associated with one \lstinline|Store| and one \lstinline|Plot| and they forms a partition. The cross-correlation itself is computation-intensive, but highly parallelizable. Therefore, this partition can be duplicated for many times for better parallelism and would get better performance.
+
+The plot step is not a part of the computation of cross-correlation, but is a step for visualization. It consumes a lot of time especially when the number of cross-correlations is large. We keep it in the workflow for a few traces, but remove it for larger number of traces (\eg 400).

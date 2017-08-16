@@ -27,7 +27,7 @@ We want to introduce more dynamic behaviours, so our expected behaviour should b
 	\item If a \tPEInst never receives any data from any input connections, this \tPEInst doesn't need to be deployed.
 \end{enumerate}
 
-To satisfy all these needs, especially the 2nd and 5th points, we need a mechanism to synchronize the knowledge of \tPEInst{}s so no duplicated deployment or lost of data will happen. Because of the nature of distributed computing, we couldn't, at least during the time, find a low-cost way (\ie without many signalling rounds) to guarantee these requirements in a fully de-centralized manner. Therefore, we introduced a coordinator to handle the deployment. We will show, in the Coordinator section below, that our communication strategy is the minimal possible.
+To satisfy all these needs, especially the 2nd and 5th points, we need a mechanism to synchronize the knowledge of \tPEInst{}s so no duplicated deployment or lost of data will happen. Because of the nature of distributed computing, we couldn't, at least during the time, find a low-cost way (\ie without many signalling rounds) to guarantee these requirements in a fully de-centralized manner. Therefore, we introduced a coordinator to handle the deployment. We will show, in \ref{sec:incdep_coord}, that our communication strategy is the minimal possible.
 
 To put all these together, the deployment behaviour now is:
 \begin{enumerate*}
@@ -57,7 +57,7 @@ When the coordinator knows the successor \tPEInst{}s, it will need to deploy the
 
 During the lookup, if there is no enough nodes available (free), the coordinator will spawn more nodes and try again. We can use different strategies to decide the number of nodes to be spawned, but we only use a constant for now.
 
-\section{Coordinator}
+\section{The Coordinator} \label{sec:incdep_coord}
 The sections above only talked about the general role and some concrete aspects of the coordinator. In this section, we present how the coordinator works when handling its main job.
 
 The coordinator first performs a topological sorting to the workflow graph in the beginning, and stores which output connection (and the \tPEInst) is connected with which input connection in a quick lookup table (\eg a hash table). It then deploys the source nodes which have no input connections (\ie zero in-degree). The coordinator stores a record (array) which keeps the status of every execution nodes, to track whether they are busy (has a \tPEInst deployed deployed at the moment) or free (has no \tPEInst deployed at the moment), and also the \tPEInst each busy node is running.
