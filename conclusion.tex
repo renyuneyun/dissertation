@@ -1,24 +1,24 @@
 \chapter{Conclusion and Future Work}
 In this document, we presented the important role of scientific workflows for today's scientific research, the classification of workflow management systems (WMSs) and \dpy, a data-streaming WMS. They formed the the background to our work. Then, we discussed two extensions, \tincdep and \tdynexp, to (the MPI mapping of) \dpy, both give \dpy more dynamics and enable further extensions or optimization. We described our design and implementation which are on the system side of \dpy so they are transparent to researchers / designers of workflows. Finally, we presented our evaluation and measurement of our extension and showed that our extension gives \dpy more dynamics at a low cost and sometimes even with better performance.
 
-Our extensions to \dpy, \tincdep and \tdynexp, jointly form a significant starting point of future extensions or optimizations to \dpy or other data-streaming WMSs. For example, one can utilize and extend \tincdep to dynamically schedule PEs to the most appropriate nodes, or utilize and extend the \tdynexp mechanism to enable more complex runtime workflow self-management behaviours \footnote{Some options are described in the \rcpt{Future Work} section below.}.
+Our extensions to \dpy, \tincdep and \tdynexp, jointly form a significant starting point for future extensions or optimizations to \dpy or other data-streaming WMSs. For example, one can utilize and extend \tincdep to dynamically schedule PEs to the most appropriate nodes, or utilize and extend the \tdynexp mechanism to enable more complex runtime workflow self-management behaviours\footnote{Some options are described in the \rcpt{Future Work} section below.}.
 
-The time limit prevented us to explore measurement with a representative sets of workflows and investigate scalability. We are also aware of the limitation in our implementation. For example, the single coordinator may become a bottleneck if communication increases; frequent operations on MPI communicators may also affect the performance. Possible extensions or optimizations is described in the rest of this chapter, so we or other developers can extend our work. Even though, we consider we have made good work during the MSc dissertation period.
+The time limit prevented us from exploring measurement with representative sets of workflows. We are also aware of the limitation in our implementation. For example, the single coordinator may become a bottleneck if communication increases; frequent manipulations on MPI communicators may also affect the performance. Possible extensions or optimizations are described in the rest of this chapter, so we or other developers can extend our work. Even though, we consider we have made good progress during the MSc dissertation period.
 
 \section{Future Work}
-The rest part of this chapter will describe possible future work. They consist of two aspects:
+The rest of this chapter will describe possible future work. They consist of two aspects:
 \begin{enumerate}
 	\item Potential optimizations to our current implementation;
-	\item Possible extension built upon our work.
+	\item Possible extensions built upon our work.
 \end{enumerate}
 
-If we were allowed more time, we would explore the potential optimizations first, and then the extension.
+If we were allowed more time, we would explore the potential optimizations first, and then the extensions.
 
-\subsection{Potential Optimization}
+\subsection{Potential Optimizations}
 In our current implementation, there are some compromises (which have been briefly mentioned in the preceeding chapters) because of the time limit. Given enough time, we would explore which ways will be better. These optimizations are considered by us:
 
 \begin{enumerate}
-	\item The \emph{process} and \emph{write} steps are combined together, and they are concurrent with the \emph{read} steps during processing. However, all they three can be executed in parallel in principle. Other aspects, such as listening to signals from the coordinator and performing actions, can also be executed in parallel in principle.
+	\item The \emph{process} and \emph{write} steps are combined together, and they are concurrent with the \emph{read} steps during processing. However, all three can be executed in parallel in principle. Other aspects, such as listening to signals from the coordinator and performing actions, can also be executed in parallel in principle.
 	\item When spawning more nodes, the current implementation always spawns a fixed pre-defined number of nodes. However, there may be a smart way to specify this number dynamically according to the workloads and known application behaviour.
 	\item After spawning new nodes, the current implementation will connect all nodes together (by merging the \emph{intercommunicator}) in one \emph{intracommunicator} in order to make all worker nodes inter-communicable. However, in the MPI implementation, the merging operation takes time and during this time no data / message can be transmitted. We will call \lstinline|Comm.Dup()| to the merged \emph{intracommunicator}, which makes the time consumption even larger. We expect a better method to handle this process so working nodes don't have to wait.
 	\item When establishing communication between nodes, the current implementation uses an \emph{existing or newest} strategy (described in the \tIncDep chapter) to select MPI \emph{communicator}s. This behaviour is introduced because of dynamic spawning and is subject to change if point 3 is changed.
@@ -26,6 +26,9 @@ In our current implementation, there are some compromises (which have been brief
 
 \subsection{Possible Extension}
 We consider our work an important step towards further extension or optimization of \dpy. Here, we present some possible further extensions or optimizations based on our extension. \\
+
+\textbf{Extending to other mappings of \dpy}\quad
+As we said in the prior part of this document, \dpy can map the same workflow to many execution platforms / frameworks. This indicates that the workflow design in \dpy is platform-neutral. However, our implementation only builds on top of one of the mappings, MPI, because of the time limit. In principle, these extensions can also be adopted to other mappings and become a feature of the whole \dpy system. \\
 
 \textbf{Dynamic scheduling}\quad
 When executing workflows, it is always better to deploy PEs smartly to reduce the time consumed for data transmission or to deploy more computation-intensive PEs to powerful nodes and less computation-intensive PEs to less powerful nodes. Therefore, it is useful to be able to deploy PEs to specific nodes according to certain factors (\eg performance data), but this is an NP-hard problem. There are some work (\eg \cite{teylo2017hybrid}) focusing on static scheduling which use prior knowledge or performance data from previous runs; however, building upon our work, future development can gather not only this kind of data but also data from the current run. Moreover, if the deployment of \tPEInst{}s can be moved from one node to another, the runtime performance data will be more useful. \\
@@ -37,7 +40,7 @@ The workload of different PEs are not balanced in nature, meaning some PEs may h
 We use a single coordinator in our implementation, which may consequently become a bottleneck (either to communication or computation). Some properties of the specific workflow graph may be useful to ease this constraint: we may analyse the workflow graph and identify separate regions (\eg connected by one PE) and assign each region one coordinator so each coordinator is only responsible for its region. This may be especially useful when the communication between worker nodes and the coordinator is expensive. \\
 
 \textbf{Pre-deployment}\quad
-It takes time from identifying the needs to deploy a PE to be aware the PE has been deployed. It may be better to deploy PEs previous to a corresponding request. However, whether this will contribute to reducing the total time or not is unknown before actually implementing it, and it is also unknown, though with some heuristics (\eg one step prior), how to identify which PEs to deploy.
+It takes time from identifying the needs to deploy a PE to be aware the PE has been deployed. It may be better to deploy PEs previous to a corresponding request. However, whether this will contribute to reducing the total time or not is unknown before actually implementing it, and it is also unknown, though with some heuristics (\eg one step prior), how to identify which PEs to deploy. \\
 
 \textbf{Dynamic construction}\quad
-In the current \dpy semantics, PEs are constructed before the execution of the workflow. It violates the semantics if the system modifies the PEs, and forces us to design \tdynexp as it is now. However, if we can construct PEs or at least modify some of its properties (in an approved explicit way) during runtime, we can make the dynamics of \tdynexp more robust - by changing the parameters used to construct the divisional PE to change its behaviour (from the coordinator side), rather than by message passing between PEs. This may be especially useful if we want to apply the existing grouping mechanism to expandable PEs.
+In the current \dpy semantics, PEs are constructed before the execution of the workflow. It violates the semantics if the system modifies the PEs outside of them, and forces us to design \tincdep and \tdynexp as they are now for backward-compatibility. However, if we can construct PEs or at least modify some of its properties (in an approved explicit way) during runtime, we can make the dynamics of \tdynexp more robust -- by changing the parameters used to construct the divisional PE to change its behaviour (from the coordinator side), rather than by message passing between PEs. This behaviour may be especially useful if we want to apply the existing grouping mechanism to expandable PEs. Specially, if we can construct PEs during runtime, \tincdep could scale better because worker nodes can construct PEs without knowing the actual workflow. 

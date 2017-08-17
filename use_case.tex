@@ -12,7 +12,7 @@ The earliest known prime-number generating algorithm is \ttesieve given by Erato
 
 As we are using prime sieves as demonstration, we mainly focus on the correctness and simplicity rather than the efficiency. Therefore, we can simply change the structure of \ttesieve into a distributed manner: each node is responsible for one prime, and it crosses out all multiples of the prime it is responsible for (so nothing streams through it when a number is crossed out); a continuous integer producer produces integers to the first sieve; each sieve node sends the uintegers that were not multiples to the next sieve node.
 
-As the description of the distributed sieve shows, we need each node responsible for each prime, which means we need to allocate at least number-of-prime sieves before executing the workflow. However, since we don't yet know which those primes are, we also don't know the number of them. This leads to a recursive dependency problem. One possible practice is to estimate the number of primes in the region and allocate that many nodes.
+As the description of the distributed sieve shows, we need each node responsible for each prime, which means we need to allocate at least number-of-prime sieves before executing the workflow. However, since we don't yet know which those primes are, we also don't know the number of them. This leads to a circular / recursive dependency problem. One possible practice is to estimate the number of primes in the region and allocate that many nodes.
 
 \newcommand{\cdIntGen}{\lstinline|IntegerProducer|\xspace}
 \newcommand{\cdSieve}{\lstinline|PrimeSieve|\xspace}
