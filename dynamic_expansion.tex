@@ -35,12 +35,7 @@ To avoid confusion, when sending the ID of PE to a node during deployment, the d
 \section{Simple Example} \label{sec:dynexp_example}
 In this section, we use \ttsieve as our example to show the difference of the semantics before and after implementing \tdynexp.
 
-We have described the structure of \ttsieve in \ref{sec:uc_sieve} (see also Figure \ref{fig:sieve_static}). If we want to construct it in the original version of \dpy, we need to estimate the number of sieves to construct the workflow. For example, if we want to know the primes up to 100, we need to assign at least 26 sieve PEs. Listing \ref{lst:wf_sieve} gives an example code to construct this workflow.
-
-\begin{figure}[h]\centering
-    \includegraphics[width=0.8\textwidth]{figures/sieve_static}
-	\caption{Workflow for the prime sieve}	\label{fig:sieve_static}
-\end{figure}
+We have described the structure of \ttsieve in section \ref{sec:uc_sieve} (see also Figure \ref{fig:sieve_static}). If we want to construct it in the original version of \dpy, we need to estimate the number of sieves to construct the workflow. For example, if we want to know the primes up to 100, we need to assign at least 26 sieve PEs. Listing \ref{lst:wf_sieve} gives an example code to construct this workflow.
 
 \begin{lstlisting}[frame=single,caption={Example code of the sieve workflow construction in the old semantics (suppose IntegerProducer and PrimeSieve are already defined},captionpos=b,label={lst:wf_sieve}]
 from dispel4py.workflow_graph import WorkflowGraph
@@ -61,7 +56,7 @@ for i in range(1, 26):
 
 It is also legal and correct to construct this workflow with sieves more than enough. For example, we can change the number 26 in line 10 to a larger number, say, 100. This workflow can also be executed and correct result will be gathered. The only problem is more nodes are needed to run this workflow, even if some nodes are actually unused (\ie no data will be sent to these nodes).
 
-The problem in this approach is that the number of sieves is unknown in the nature of this algorithm, but the number is required to define the workflow. As discussed in \ref{sec:uc_sieve}, we encounter a chicken-and-egg problem. This problem also makes the workflow not universal because the number of sieve PEs is different for different ranges of numbers.
+The problem in this approach is that the number of sieves is unknown in the nature of this algorithm, but the number is required to define the workflow. As discussed in section \ref{sec:uc_sieve}, we encounter a chicken-and-egg problem. This problem also makes the workflow not universal because the number of sieve PEs is different for different ranges of numbers.
 
 In \tdynexp, we introduce the expansion behaviour so this problem is eliminated. To construct such a workflow, we only need to create a expandable sieve PE, and add it only once to the workflow. Example code is shown in Listing \ref{lst:wf_sieve_dynexp}.
 
