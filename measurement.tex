@@ -69,17 +69,16 @@ Number of sieves & 26 & 168 & 303 & 430 & 550 & 669 & 783 & 900 \\ \hline
 \section{Incremental deployment}
 The working process of \tincdep was described in \ref{sec:incdep_example} and the correctness was also shown there. This section focuses on the performance issues.
 
-As said above, we use the cross-correlation workflow (xcorr) as the main workflow to demonstrate the performance. We run the workflows under different configurations, as describe above. Generally, for both workflows, we use one more node for the \tincdep version, which is required because of the mechanism of \tincdep and is an unavoidable overhead. One exception is when we reach the maximum number of cores requested on EDDIE: we only use as many as the number of cores for the number of nodes because of the restriction of the platform. To make it easier to read, we show only the number of worker nodes for \tincdep -- by subtracting $1$ from the number of nodes\footnote{However this will lead to unalignment when the number of processes is the same  as the number of cores on EDDIE.}. We present the results in Figure \ref{fig:xcorr_infcluster}, \ref{fig:xcorr_infcluster_90_2}, \ref{fig:xcorr_eddie} and \ref{fig:xcorr_eddie_400}.
+As said above, we use the cross-correlation workflow (xcorr) as the main workflow to demonstrate the performance. We run the workflows under different configurations, as describe above. Generally, for both workflows, we use one more node for the \tincdep version, which is required because of the mechanism of \tincdep and is an unavoidable overhead. One exception is when we reach the maximum number of cores requested on EDDIE: we only use as many as the number of cores for the number of nodes because of the restriction of the platform. To make it easier to read, we show only the number of worker nodes for \tincdep -- by subtracting $1$ from the number of nodes\footnote{However this will lead to misalignment when the number of processes is the same as the number of cores on EDDIE, which is \textbf{not} a mistake or error.}. We present the results in Figure \ref{fig:xcorr_infcluster}, \ref{fig:xcorr_infcluster_90_2}, \ref{fig:xcorr_eddie} and \ref{fig:xcorr_eddie_400}.
 
 \begin{figure}[h]
 \centering
+\begin{minipage}{\textwidth}
     \includegraphics[width=1\textwidth]{figures/xcorr_infcluster_90day_4tr}
-  \begin{minipage}{\textwidth}
-
     \caption[Caption for LOF]%
       {Execution time of XCorr (without plotting) on InfCluster with 4 traces of length 90 days\footnote{The period of time for which the seismic trace was recorded.}.}
-  \end{minipage}
 \label{fig:xcorr_infcluster}
+\end{minipage}
 \end{figure}
 
 \begin{figure}[h]
@@ -92,14 +91,14 @@ As said above, we use the cross-correlation workflow (xcorr) as the main workflo
 \begin{figure}[h]
 \centering
     \includegraphics[width=1.10\textwidth]{figures/xcorr_eddie_90day_4tr}
-\caption{Execution time of XCorr (with plotting) on EDDIE with 4 traces of length 90 days}
+\caption{Execution time of XCorr (with plotting) on EDDIE with 4 traces of length 90 days.}
 \label{fig:xcorr_eddie}
 \end{figure}
 
 \begin{figure}[h]
 \centering
     \includegraphics[width=1\textwidth]{figures/xcorr_eddie_1h_400tr}
-\caption{Execution time of XCorr (without plotting) on EDDIE with 400 traces of length 1 hour}
+\caption{Execution time of XCorr (without plotting) on EDDIE with 400 traces of length 1 hour.}
 \label{fig:xcorr_eddie_400}
 \end{figure}
 
@@ -108,14 +107,14 @@ To better explain and show some of the behaviours or properties, we also perform
 \begin{figure}[h]
 \centering
     \includegraphics[width=0.8\textwidth]{figures/sieve_static_32}
-\caption{Static sieves executed by both the original and the new version of \dpy on InfCluster with 32 cores}
+\caption{Static sieves executed by both the original and the new version of \dpy on InfCluster with 32 cores.}
 \label{fig:sieve_static_32}
 \end{figure}
 
 \begin{figure}[h]
 \centering
     \includegraphics[width=0.8\textwidth]{figures/sieve_static_128}
-\caption{Static sieves executed by both the original and the new version of \dpy on InfCluster with 128 cores}
+\caption{Static sieves executed by both the original and the new version of \dpy on InfCluster with 128 cores.}
 \label{fig:sieve_static_128}
 \end{figure}
 
@@ -170,7 +169,7 @@ The results are shown in Figure \ref{fig:sieve_opt_100} and \ref{fig:sieve_opt_1
 \begin{figure}[h]
 \centering
     \includegraphics[width=1\textwidth]{figures/sieve_opt1_1000}
-\caption{Execution time of the prime sieve to find prime up to 1000 on the old and new semantics}
+\caption{Execution time of the prime sieve to find prime up to 1000 on the old and new semantics.}
 \label{fig:sieve_opt_1000}
 \end{figure}
 

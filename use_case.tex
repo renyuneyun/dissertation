@@ -25,7 +25,8 @@ In the current \dpy system, to construct a workflow for this, we first define tw
 
 \begin{figure}[h]\centering
     \includegraphics[width=0.8\textwidth]{figures/sieve_static}
-	\caption{Workflow for the prime sieve}	\label{fig:sieve_static}
+	\caption{Workflow for the prime sieve.}
+\label{fig:sieve_static}
 \end{figure}
 
 To define the graph, we need exactly two numbers: one is the range (\ie the maximum number) and the other is the number of primes in this region. Typically, we need to first find out the number of primes in this range by running a prime generator elsewhere, and then use it to construct the workflow. If we set the number smaller, the workflow can execute, but will produce unreliable numbers when the actual number of primes exceeds the number of sieves defined in the workflow graph; if we set the number larger, the correctness of the workflow execution will then depend on how outputs from the sieves are connected to the successor nodes (e.g. if only the final sieve is connected to the successor nodes, then there will be no outputs from the last sieve and, therefore, no inputs to the successor so it will behave erroneously).
@@ -46,7 +47,7 @@ Cross-correlation is a method used in seismology to process data from the observ
 \begin{figure}[h]
 \centering
     \includegraphics[width=0.8\textwidth]{figures/wf_xcorr}
-\caption{Illustration of the cross-correlation workflow by \citeauthor{doi:10.1177/1094342016649766}\cite{doi:10.1177/1094342016649766}}
+\caption{Illustration of the cross-correlation workflow by \citeauthor{doi:10.1177/1094342016649766}\cite{doi:10.1177/1094342016649766}.}
 \label{fig:wf_xcorr}
 \end{figure}
 
@@ -59,7 +60,7 @@ The workflow\footnote{Originates from \url{https://github.com/rosafilgueira/disp
 \begin{figure}[h]
 \centering
     \includegraphics[width=0.8\textwidth]{figures/wf_xcorr_us}
-\caption{Illustration of the cross-correlation workflow we use}
+\caption{Illustration of the cross-correlation workflow we use.}
 \label{fig:wf_xcorr_us}
 \end{figure}
 
