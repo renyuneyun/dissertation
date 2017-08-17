@@ -85,7 +85,7 @@
 
 %% Specify the abstract here.
 \abstract{%
-\sout{This is the abstract containing the main content of the dissertation document. Abstract is with title page.}
+Although workflows and relevant technologies are being used widely, there are still some aspects that current workflow management systems (WMSs) did not cover. The data-streaming style is the future trend but current systems did not fully utilize the properties of data-streaming. We present two extensions, \tincdep and \tdynexp, to \dpy, a data-streaming WMS, to add more dynamics during runtime and enable future extensions and optimizations: \tincdep allows \dpy to incrementally deploy PEs to nodes during runtime rather than at the beginning of the execution; \tdynexp enables \dpy to dynamically manipulate the workflow according to actual needs. We build these two extensions on top of the MPI mapping of \dpy and demonstrate they two extend \dpy at a low cost and scale reasonably. We also show there is space to optimize so the overhead may reduce and these two extensions opens several windows for future extensions and optimizations.
 }
 
 \begin{document}
@@ -93,8 +93,11 @@
 \maketitle
 
 \begin{acknowledgements}
-Many thanks to my mummy for the numerous packed lunches; and of course to
-Igor, my faithful lab assistant.
+Many thanks to my supervisor, Prof.\ Malcolm Atkinson, who gave me many initial ideas, helped to improve the assumptions and designs and kindly assisted my write-up for the dissertation; and thanks to Rosa Filgueira, my co-supervisor, who kindly gave me many suggestions about the details and the dissertation thesis. Of course, thanks for the help and teaching of all my previous lecturers and teachers.
+
+I also appreciate the previous work of the researchers in workflow-related technologies for they have enabled this research field and presented many valuable ideas and examples.
+
+Also thanks to the help from many people online who helped me to figure out the usage of some toolkits, as well as the authors of many toolkits, including mpi4py which is one of the basis of our work.
 \end{acknowledgements}
 
 \standarddeclaration
