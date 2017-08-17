@@ -19,34 +19,50 @@ RAM (GB) & 8 & 64 & 64, 128 \\ \hline
 \label{tbl:list_measurement}
 \end{table}
 
-As shown in the table, we use several configurations on the clusters. The EDDIE cluster restrict users to use only multiples of 16 as the number of cores. It also restricts us to use at most the same number of cores the number of MPI processing elements, so we can't measure large sieves on it.
+The EDDIE cluster restricts users to use only multiples of 16 as the number of cores. It also restricts us to use at most the same number of cores the number of MPI processing elements, so we can't measure large sieves on it.
 
-We use several different workflows and configurations to test different aspects of the system's performance. For the prime sieve, we use several different ranges, both the static version and the dynamic version, to test the correctness of our system. We also very the number of nodes and the number of initial nodes (for the dynamic version). For cross correlation, we vary the number of nodes to see how performance changes.
+We use several different workflows and configurations to test different aspects of the system's performance. For the prime sieve, we use several different ranges, both the static version and the dynamic version, to test the correctness of our system. We also very the number of nodes and the number of initial nodes (for the dynamic version). For cross correlation, we vary the number of nodes to see how performance changes. For each measurement, we run the same configuration for several (7 or more) times to get a more typical performance.
 
 \section{Incremental deployment}
 The working process of \tincdep was described in \ref{sec:incdep_example} and the correctness was also shown there. This section focuses on the performance issue.
 
-As said above, we use the cross correlation workflow (xcorr) as the main workflow to demonstrate the performance. We run the workflows under different configurations, as describe above. Generally, for both workflows, we use one more node for the \tincdep version, which is required because of the mechanism of \tincdep and is an unavoidable overhead. One exception is when we reach the maximum number of cores requested on EDDIE: we only use as many as the number of cores for the number of nodes because of the restriction of the platform. To make it easier to read, we show only the number of worker nodes for \tincdep -- by subtracting $1$ from the number of nodes\footnote{However this will lead to unalignment when the number of processes is the same  as the number of cores on EDDIE.}. We present the results in Figure \ref{fig:xcorr_infcluster} and \ref{fig:xcorr_eddie}.
+As said above, we use the cross correlation workflow (xcorr) as the main workflow to demonstrate the performance. We run the workflows under different configurations, as describe above. Generally, for both workflows, we use one more node for the \tincdep version, which is required because of the mechanism of \tincdep and is an unavoidable overhead. One exception is when we reach the maximum number of cores requested on EDDIE: we only use as many as the number of cores for the number of nodes because of the restriction of the platform. To make it easier to read, we show only the number of worker nodes for \tincdep -- by subtracting $1$ from the number of nodes\footnote{However this will lead to unalignment when the number of processes is the same  as the number of cores on EDDIE.}. We present the results in Figure \ref{fig:xcorr_infcluster}, \ref{fig:xcorr_infcluster_90_2} and \ref{fig:xcorr_eddie}.
 
 \begin{figure}[h]
 \centering
-    \includegraphics[width=1\textwidth]{figures/xcorr_infcluster_30day_2tr}
-\caption{Execution time of XCorr (with plotting) on InfCluster with 2 traces in 30 days}
+    \includegraphics[width=0.9\textwidth]{figures/xcorr_infcluster_90day_4tr}
+\caption{Execution time of XCorr (without plotting) on InfCluster with 4 traces in 90 days}
 \label{fig:xcorr_infcluster}
 \end{figure}
 
 \begin{figure}[h]
 \centering
-    \includegraphics[width=1\textwidth]{figures/xcorr_eddie_90day_2tr}
-\caption{Execution time of XCorr (with plotting) on EDDIE with 2 traces in 90 days}
-\label{fig:xcorr_eddie_2tr}
+    \includegraphics[width=0.9\textwidth]{figures/xcorr_infcluster_90day_2tr}
+\caption{Execution time of XCorr (without plotting) on InfCluster with 2 traces in 90 days}
+\label{fig:xcorr_infcluster_90_2}
 \end{figure}
 
 \begin{figure}[h]
 \centering
-    \includegraphics[width=1\textwidth]{figures/xcorr_eddie_90day_4tr}
+    \includegraphics[width=1.10\textwidth]{figures/xcorr_eddie_90day_4tr}
 \caption{Execution time of XCorr (with plotting) on EDDIE with 4 traces in 90 days}
 \label{fig:xcorr_eddie}
+\end{figure}
+
+To better explain and show some of the behaviours or properties, we also performed a set of measurements on the InfCluster with the static version of the prime sieve workflow. We used static numbers of processes (\emph{just enough} to execute the job) for both the original system and the new system. The results are shown in Figure  \ref{fig:sieve_static_32} and \ref{fig:sieve_static_128}.
+
+\begin{figure}[h]
+\centering
+    \includegraphics[width=0.8\textwidth]{figures/sieve_static_32}
+\caption{Static sieves executed by both the original and the new version of \dpy on InfCluster with 32 cores}
+\label{fig:sieve_static_32}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+    \includegraphics[width=0.8\textwidth]{figures/sieve_static_128}
+\caption{Static sieves executed by both the original and the new version of \dpy on InfCluster with 128 cores}
+\label{fig:sieve_static_128}
 \end{figure}
 
 We explain here the notations in the figures:
@@ -67,11 +83,19 @@ In the figures, we show two different recordings of time: one is inside the prog
 
 We have removed some significant outliers from the data used to draw the figures. There are still some data points outside of one standard deviation but we can not sensibly remove them because they are not apparently away from other data points. These outliers could be caused by the resources used by other processes in the OS of the execution machine(s) because we are using shared-resource platforms to perform our measurement.
 
-As shown in figures, the total execution time is not far between the original \dpy version and our modification (\tincdep). The time difference is almost always constant (less than 10 seconds) so we have confidence that it won't increase when the total execution time increases and is acceptable when using under production -- because the total execution time would be significantly longer than that in our demonstration so this small difference won't even be noticed. The difference between each two time recordings of each configurations also shows that the time consumed to initialize one extra process (for the coordinator) isn't significant.
+We can get four kinds of information from the figures: \\\\
+\textbf{Actual data processing takes significantly more time than the communication led by \tincdep}\quad
+The total execution time is not far between the original \dpy version and our modification (\tincdep) in all figures. The time difference is almost always constant (less than 10 seconds) so we have confidence that it won't increase when the total execution time increases and is acceptable when using under production -- because the total execution time would be significantly longer than that in our demonstration so this small difference won't even be noticed. The difference between each two time recordings of each configurations also shows that the time consumed to initialize one extra process (for the coordinator) isn't significant. \\\\
+\textbf{Synchronization causes overheads}\quad
+In the second half of Figure \ref{fig:xcorr_eddie} when the number of processes is larger than needed, our version of system consumes almost constant time while the original version varies much. We define \emph{needed} as: processes are just enough to fully parallelize the computation. Because of the definition of the cross correlation workflow, the number of cross correlation is $C^2_n$ \footnote{Also denoted as $\binom{n}{k}$.} for $n$ traces where $C^k_n$ represents the number of $k$ combinations in $n$ elements. This leads to $1+C^2_n \cdot 2$ processes for $n$ traces when the workflow does not contain the plotting step and $1+C^2_n \cdot 2$ when the workflow contains the plotting step. For 2 traces, the number of needed processes is 3 (or 4 if including plotting); for 4 traces, the number of needed processes is 13 (or 19 if including plotting).
 
-Notice in the second half of Figure \ref{fig:xcorr_eddie} when the number of processes is larger than needed, our version of system consumes almost constant time while the original version varies much. We define \emph{needed} as: processes are just enough to fully parallelize the computation. Because of the definition of the cross correlation workflow, the number of cross correlation is $C^2_n$ \footnote{Also denoted as $\binom{n}{k}$.} for $n$ traces where $C^k_n$ represents the number of $k$ combinations in $n$ elements. This leads to $1+C^2_n \cdot 2$ processes for $n$ traces when the workflow does not contain the plotting step and $1+C^2_n \cdot 2$ when the workflow contains the plotting step. For 2 traces, the number of needed processes is 3 (or 4 if including plotting); for 4 traces, the number of needed processes is 13 (or 19 if including plotting). We argue this is because the number of cores of each machine in EDDIE is 16 so 32 cores involves inter-machine communication so using \lstinline|comm.Barrier()| (which is what we added to the original version of \dpy to synchronize and record time) takes more time compared to our one-sided communication (only the coordinator sends signals to workers) in \tincdep. We believe this also forms the reason why the ever-increasing time happens in Figure \ref{fig:xcorr_infcluster} and \ref{fig:xcorr_eddie_2tr} because increasing the number of processes is pure overheads when there are only 2 traces.
+We argue this is because the number of cores of each machine in EDDIE is 16 so 32 cores involves inter-machine communication so using \lstinline|comm.Barrier()| (which is what we added to the original version of \dpy to synchronize and record time) takes more time compared to our one-sided communication (only the coordinator sends signals to workers) in \tincdep. \\\\
+\textbf{Initialization on InfCluster is significantly slow}\quad
+In Figure \ref{fig:xcorr_infcluster} and \ref{fig:xcorr_infcluster_90_2}, there are huge gaps between the time recorded inside and outside. This indicates much time is consumed during the initialization of MPI runtime, while the time for actual data computation is almost the same as the EDDIE platform (Figure \ref{fig:xcorr_eddie}). This behaviour is also demonstrated in Figure \ref{fig:sieve_static_32} and \ref{fig:sieve_static_128}. \\\\
+\textbf{Increasing the number of PEs increases the overhead led by \tincdep}\quad
+We can see in Figure \ref{fig:sieve_static_32} and \ref{fig:sieve_static_128} that the gap between the original version and the new version increases along with the increasing of the number of PEs (reflected by the number of sieves). As shown in the figure, this overhead grows approximately linearly. We performed a linear regression on the \textbf{inside} record of time, and the slope is about $0.15$. This shows the overhead will increase but is unlikely to ``explode''. \\
 
-Regardless of these phenomena, the time consumed between our new system with \tincdep and the original system without \tincdep is quite close, as stated above. Also notice there are some compromises in our implementation so there is still space to get better performance (\ie less time consumption). We believe this won't add significant overheads to a production environment so our extension is acceptable compared to the potential benefits and future optimizations it may bring.
+In conclusion, the time consumed between our new system with \tincdep and the original system without \tincdep is quite close especially when the total number of PEs is small. Also notice there are some compromises in our implementation so there is still space to get better performance (\ie less time consumption). We believe this won't add significant overheads to a production environment so our extension is acceptable compared to the potential benefits and future optimizations it may bring.
 
 \section{Dynamic expansion}
 \tDynexp is the new property we have added to dispel4py. We use the prime sieve as our example to demonstrate how the system performs when using \tdynexp. The details of the workflows were described in \ref{sec:dynexp_example}.
@@ -94,7 +118,7 @@ The results are shown in Figure \ref{fig:sieve_opt_100} and \ref{fig:sieve_opt_1
 
 Similarly, we also removed significant outliers. The number of outliers is larger in InfCluster compared to EDDIE. This may be because the number of cores of each machine in InfCluster is larger than that of EDDIE and each machine can host more jobs, so more people are sharing the same machine. Another possible reason is because the prime sieve is not computation-intensive so the effect and latency of communication govern the performance but they are more unpredictable than the computation.
 
-The x axis in these figures is different from the previous figures (\eg Figure \ref{fig:xcorr_eddie}) -- the ``number of iterations'' means how many times the producer repeatedly produces numbers from 2 to the upper bound. One reason is because we are no longer evaluating the performance difference caused by introducing \tincdep; the other reason is we want to show the consistency of the performance -- when increasing the number of iterations, more data (numbers) go through the workflow but no more PEs are deployed or created.
+The horizontal axis in these figures is different from the previous figures (\eg Figure \ref{fig:xcorr_eddie}) -- the ``number of iterations'' means how many times the producer repeatedly produces numbers from 2 to the upper bound. One reason is because we are no longer evaluating the performance difference caused by introducing \tincdep; the other reason is we want to show the consistency of the performance -- when increasing the number of iterations, more data (numbers) go through the workflow but no more PEs are deployed or created.
 
 As we can see in the figures, there is no significant indication of whether the dynamic version is better or the static version is better. We argue that this is because much time is used to initialize for MPI communication. The dynamic version spawns significantly fewer nodes in the beginning so it can start early and adjust during runtime (so the leftmost points always show the dynamic version performs better). 
 
