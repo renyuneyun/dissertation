@@ -43,6 +43,8 @@ In the old \dpy system, because all \tPEInst{}s are deployed in the beginning, a
 
 In \tincdep, when a \tPEInst produces a unit of data and sends it through an output connection, this action triggers a lookup to find the correct targets (both input connections and nodes). If the targets have not been deployed yet, the send action will hang up to wait for the completion of the deployment (which is performed by the coordinator) of the targets and then the send action proceeds.
 
+In principle, there is a ``start-of-stream'' marker before actually sending data and an ``end-of-stream'' marker after sending all data. One of the main role of the ``start-of-stream'' marker is to synchronize and guarantees no loss of data would happen because the receiver is not ready yet. However, the ordered message is guaranteed by MPI, so we drop the explicit use of the ``start-of-stream'' marker and consider it implied in the first unit of data. The ``end-of-stream'' marker will be discussed in described in section \ref{sec:shutdown_proc}.
+
 In our implementation, when a \tPEInst produces a unit of data, the node (which runs the \tPEInst) will communicate with the coordinator to request the destination(s) of the output connection. Then it waits for the reply from the coordinator to tell it where that data should be sent to. When it receives the reply, it caches the information (reply) and when next time it is going to send data through the same output connection, it will use the cached information instead of communicating with the coordinator a second time. 
 The deployment strategy and process is hidden to the execution nodes, so their main job is still executing the \tPEInst.
 
@@ -71,7 +73,7 @@ When deploying the \tPEInst, the coordinator sends the information necessary for
 
 We can think of another alternative method to deploy nodes which may be more flexible: send instructions/information necessary to construct the \tPEInst from its \tPETmpl to the target node (and also adjust the workflow not to directly use \tPEInst{}s but to use construction information for every \tPEInst{}), so the coordinator can modify these instructions/information if needed. This method may achieve better performance and scalability because the lookup process on each node only depends on the total number of \tPETmpl{}s rather than the total number of \tPEInst{}s in the workflow and each node, in principle, does not need to know anything about the actual workflow. However, because we are constrained by time, we only conservatively implemented this backward-compatible method and did not introduce the new semantics we proposed here.
 
-\section{Shutdown Process}
+\section{Shutdown Process} \label{sec:shutdown_proc}
 The execution should be able to begin, and should also be able to shutdown properly. In this section, we describe how the shutdown process works.
 
 \newcommand{\dEOS}{end-of-stream\xspace}
@@ -88,6 +90,28 @@ We used an attributive, ``enough'', for correctness in case an input connection 
 By using this method, all nodes will be guaranteed to shut down correctly when there is no more work to do and therefore no more data to produce. We keep this behaviour in our extension (with one difference which will be described in the \rcpt{Lazy Deployment} section) so the coordinator doesn't need to propagate shutdown signals.
 
 But we'd like the coordinator to be aware of the status of all nodes so it can re-deploy other \tPEInst{}s to a node which has released the \tPEInst it was responsible for so the resources will be better used. Therefore, we add an additional signal to tell the coordinator that the \tPEInst is shutting down and its host node is releasing this \tPEInst now. When the coordinator receives this signal, it then marks the signal source as free so the coordinator can re-deploy other \tPEInst{}s to it.
+
+\subsection{Backward shutdown propagation}
+\defTerm{bspp}{backward shutdown propagation}
+\newcommand{\dNLIntr}{no-longer-interested}
+
+The previous contents of this sections talks about the normal shutdown propagation process which could be called forward shutdown propagation. We propose here another type of shutdown dynamics, \tbspp, that may be useful in certain scenarios.
+
+When performing a long-running job, the user may be interested in the outputs. If the user identifies anything wrong, he / she should be able to stop the execution. Currently, there is no safe mechanism to guarantee the correct early-shutdown for the execution of workflows.
+
+Similarly, we could consider a workflow which has two long branches: one for debugging messages; one for normal outputs. A user may be monitoring the debugging messages (\eg a PE is a visualizer) and he discovers no error so he would like the workflow to continue running. However, because producing debugging messages costs large resource, the user would like to close this branch for producing debugging messages while keep the other outputs running normally.
+
+The current \dpy system has no support of runtime dynamic shutdown (either entirely or partially) initiated from the user or PE side -- the only way is to shut down the whole system. We propose the \tbspp to fill this gap. However, because of the time limit, this is merely an early-stage assumption and is no implemented in the system.
+
+By using \tbspp, when the user or any PE (say, \emph{O}) in the workflow wants to initiate a shutdown, the node (which hosts the PE) sends a \dNLIntr signal to the coordinator and sends the \dNLIntr signal backward to all nodes which host a PE that has output ports connected with this PE (\emph{O}). After sending these signals, it executes the normal forward shutdown propagation process.
+
+When a node receives a \dNLIntr signal, it records this signal for the corresponding output port and no longer sends data to that node. When it receives \dNLIntr markers from all receivers of an output port, it could mark this output port as closed and no longer sends any data through this output port. When all output ports are closed and no more output ports to open (\ie there were data sent through all output ports previously), this node propagates the \dNLIntr marker to all its previous nodes, sends \dNLIntr to the coordinator and shuts down. During this shutdown process, there is no need to propagate the \dEOS marker to all successor nodes because they are all marked as \dNLIntr and have shut down already or will shut down soon.
+
+When the coordinator receives a \dNLIntr marker, it marks the PE of that node as \dNLIntr. If this PE is involved as a target in a request, it will be denoted as \dNLIntr in the reply (we can also simple ignore it and achieve the same effect). The node which receives this reply checks to see whether all output ports are \dNLIntr (or contain only \dNLIntr targets), which follow the same manner as stated in the paragraph above.
+
+By using this method, we enable users to initiate shutdown regardless of the position of that PE in the workflow. It also allows to shut down part of the workflow while keeps other parts running normally.
+
+However, as we have stated, this assumption is still early-stage and is not complete. There remains one issue: if one node (\emph{A}) requires targets while the signalling of being \dNLIntr (of node \emph{B}) is on the way to the coordinator, \emph{A} will send data to \emph{B} after \emph{B} has finished sending the \dNLIntr marker to all its known predecessors. We consider this solvable by using a round-communication between \emph{B} and the coordinator: \emph{B} informs the coordinator that it is no longer interested in receiving more data; the coordinator approves \emph{B} to broadcast \dNLIntr markers to all predecessors and also sends the list of all predecessors of \emph{B}. However, we are not sure whether this is the best strategy or not, so we didn't implement it yet.
 
 \section{Lazy Deployment}
 Lazy deployment is not a specially designed feature, but a natural feature emerged during the implementation of \tincdep.

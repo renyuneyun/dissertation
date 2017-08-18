@@ -177,6 +177,8 @@ Similarly, we also removed significant outliers. The number of outliers is large
 
 The horizontal axis in these figures is different from the previous figures (\eg Figure \ref{fig:xcorr_eddie}) -- the ``number of iterations'' means how many times the producer repeatedly produces numbers from 2 to the upper bound. One reason is because we are no longer evaluating the performance difference caused by introducing \tincdep; the other reason is we want to show the consistency of the performance -- when increasing the number of iterations, more data (numbers) go through the workflow but no more PEs are deployed or created.
 
+In Figure \ref{fig:sieve_opt_100}, the number of sieves is one more than the number of primes between 2 and 100. We deliberately add it by one to show that the workflow executes correctly with a larger estimation of the number of primes.
+
 As we can see in the figures, there is no significant indication of whether the dynamic version or the static version is better. We argue that this is because much time is used to initialize for MPI communication. The dynamic version spawns significantly fewer nodes in the beginning so it can start earlier and adjust during runtime (so the leftmost points always show the dynamic version performs better). 
 
 When increasing the number of iterations, the producer node executes longer so it can not be reused before finishing producing. Therefore, the coordinator can not reuse the producer node and also other nodes, so it is forced to spawn more nodes. This (and also producing more data takes more time) explains why the time consumed in execution increases when increasing the number of iterations.
