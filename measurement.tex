@@ -69,7 +69,7 @@ Number of sieves & 26 & 168 & 303 & 430 & 550 & 669 & 783 & 900 \\ \hline
 \section{Incremental deployment}
 The working process of \tincdep was described in \ref{sec:incdep_example} and the correctness was also shown there. This section focuses on the performance issues.
 
-As said above, we use the cross-correlation workflow (xcorr) as the main workflow to demonstrate the performance. We run the workflows under different configurations, as describe above. Generally, for both workflows, we use one more node for the \tincdep version, which is required because of the mechanism of \tincdep and is an unavoidable overhead. One exception is when we reach the maximum number of cores requested on EDDIE: we only use as many as the number of cores for the number of nodes because of the restriction of the platform. To make it easier to read, we show only the number of worker nodes for \tincdep -- by subtracting $1$ from the number of nodes\footnote{However this will lead to misalignment when the number of processes is the same as the number of cores on EDDIE, which is \textbf{not} a mistake or error.}. We present the results in Figure \ref{fig:xcorr_infcluster}, \ref{fig:xcorr_infcluster_90_2}, \ref{fig:xcorr_eddie} and \ref{fig:xcorr_eddie_400}.
+As said above, we use the cross-correlation workflow (xcorr) as the main workflow to demonstrate the performance. We run the workflows under different configurations, as describe above. Generally, for both workflows, we use one more node for the \tincdep version, which is required because of the mechanism of \tincdep and is an unavoidable overhead. One exception is when we reach the maximum number of cores requested on EDDIE: we only use as many as the number of cores for the number of nodes because of the restriction of the platform. To make it easier to read, we show only the number of worker nodes for \tincdep -- by subtracting $1$ from the number of nodes\footnote{However this will lead to misalignment when the number of processes is the same as the number of cores on EDDIE, which is \textbf{not} a mistake or error.}. We present the results in Figure \ref{fig:xcorr_infcluster}, \ref{fig:xcorr_infcluster_90_2}, \ref{fig:xcorr_eddie}, \ref{fig:xcorr_eddie_400} and \ref{fig:xcorr_eddie_400_dummy}.
 
 \begin{figure}[h]
 \centering
@@ -97,9 +97,16 @@ As said above, we use the cross-correlation workflow (xcorr) as the main workflo
 
 \begin{figure}[h]
 \centering
-    \includegraphics[width=1\textwidth]{figures/xcorr_eddie_1h_400tr}
+    \includegraphics[width=1\textwidth]{figures/xcorr_noplot_eddie_1h_400tr}
 \caption{Execution time of XCorr (without plotting) on EDDIE with 400 traces of length 1 hour.}
 \label{fig:xcorr_eddie_400}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+    \includegraphics[width=1\textwidth]{figures/xcorr_dummy_eddie_1h_400tr}
+\caption{Execution time of XCorr (without actually writing to disk) on EDDIE with 400 traces of length 1 hour.}
+\label{fig:xcorr_eddie_400_dummy}
 \end{figure}
 
 To better explain and show some of the behaviours or properties, we also performed a set of measurements on the InfCluster with the static version of the prime sieve workflow. We used static numbers of processes (\emph{just enough} to execute the job) for both the original system and the new system. The results are shown in Figure  \ref{fig:sieve_static_32} and \ref{fig:sieve_static_128}.
@@ -138,9 +145,9 @@ We have removed some significant outliers from the data used to draw the figures
 
 We can obtain much information from the figures, and we summarize them into five categories: \\\\
 \textbf{Actual data processing takes significantly more time than the communication led by \tincdep}\quad
-The total execution time is not significantly different from the original \dpy version and our modification (\tincdep) in all figures. The time difference is almost always constant for each configuration (\eg less than 10 seconds in Figure \ref{fig:xcorr_eddie}) so we have confidence that it won't increase when the total execution time increases and is acceptable when using under production -- because the total execution time would be significantly longer than that in our demonstration so this small difference won't even be noticed. The difference between each two time recordings of each configurations also shows that the time consumed to initialize one extra process (for the coordinator) isn't significant. \\\\
+The total execution time is not significantly different from the original \dpy version and our modification (\tincdep) in all figures (excluding Figure \ref{fig:xcorr_eddie_400_dummy}, which will be explained later). The time difference is almost always constant for each configuration (\eg less than 10 seconds in Figure \ref{fig:xcorr_eddie}) so we have confidence that it won't increase when the total execution time increases and is acceptable when using under production -- because the total execution time would be significantly longer than that in our demonstration so this small difference won't even be noticed. The difference between each two time recordings of each configurations also shows that the time consumed to initialize one extra process (for the coordinator) isn't significant. \\\\
 \textbf{Inter-machine communication causes overheads}\quad
-In Figure \ref{fig:xcorr_eddie_400}, the first subfigure shows the performance of \tincdep matches the performance of the old system, and increasing parallelization increases performance in its range. However, in the second subfigure, the total execution time rises when the number of processes increased from 8 to 12 and never went down with increasing of the number of processes. We believe this is because of inter-machine communication -- each machine in EDDIE consists of 16 cores so we are actually using 2 machines when requesting 32 cores (which is the case of the second subfigure). \\\\
+In Figure \ref{fig:xcorr_eddie_400}, the result shows the performance of \tincdep matches the performance of the old system, and increasing parallelization increases performance in its range. However, in Figure \ref{fig:xcorr_eddie_400_dummy}, the total execution time went down only when the number of processes increased from 4 to 8 and even rose with the increasing of process numbers. We suspect this is because of inter-machine communication -- each machine in EDDIE consists of 16 cores so we are actually using 2 machines when requesting 32 cores. \\\\
 \textbf{Synchronization causes overheads}\quad
 In the second half of Figure \ref{fig:xcorr_eddie} when the number of processes is larger than needed, our version of system consumes almost constant time while the original version varies much. We define \emph{needed} as: processes are just enough to fully parallelize the computation. Because of the definition of the cross-correlation workflow, the number of cross-correlation is $C^2_n$ \footnote{Also denoted as $\binom{n}{k}$.} for $n$ traces where $C^k_n$ represents the number of $k$ combinations in $n$ elements. This leads to $1+C^2_n \cdot 2$ processes for $n$ traces when the workflow does not contain the plotting step and $1+C^2_n \cdot 2$ when the workflow contains the plotting step. For 2 traces, the number of needed processes is 3 (or 4 if including plotting); for 4 traces, the number of needed processes is 13 (or 19 if including plotting).
 
